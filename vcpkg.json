@@ -1,0 +1,12 @@
+{
+  "dependencies": [
+    "glm",
+    "sdl3",
+    {
+      "name": "glad",
+      "features": [ "gl-api-46", "extensions" ]
+    },
+    "gli"
+  ],
+  "builtin-baseline": "5f8c424e267b7360d451df406eeefb3767985b17"
+}
