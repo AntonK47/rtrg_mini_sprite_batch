@@ -12,11 +12,14 @@
 #include <fstream>
 #include <print>
 
-void APIENTRY DebugCallback(uint32_t uiSource, uint32_t uiType, uint32_t uiID, uint32_t uiSeverity, int32_t iLength,
-							const char* p_cMessage, void* p_UserParam)
+void __stdcall MessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
+							   const GLchar* message, const void* userParam)
 {
-	std::println("{}", p_cMessage);
+	std::println(stderr, "GL debug message: {} type = 0x{}, severity = 0x{}, message = {}\n",
+				 (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
 }
+
+#define glLabel(s) (GLuint) strlen(s), s
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
@@ -61,23 +64,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	}
 
 	int version = gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress);
-	std::println("GL {}.{}\n", version, version);
+	// std::println("GL {}.{}\n", version, version);
 
 	SDL_GL_MakeCurrent(window, gl_context);
 	SDL_GL_SetSwapInterval(1); // Enable vsync
 	SDL_ShowWindow(window);
 
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
-	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-
-	// Set up the debug info callback
-	glDebugMessageCallback((GLDEBUGPROC)&DebugCallback, NULL);
-
-	// Set up the type of debug information we want to receive
-	uint32_t uiUnusedIDs = 0;
-	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, &uiUnusedIDs, GL_TRUE); // Enable all
-	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL,
-						  GL_FALSE); // Disable notifications
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback((GLDEBUGPROC)&MessageCallback, NULL);
+	uint32_t unusedIds = 0;
+	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, &unusedIds, GL_TRUE);
+	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE);
 
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
@@ -96,11 +94,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	bool show_another_window = false;
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+	//OPENGL DSA example: https://github.com/g-truc/ogl-samples/blob/38cada7a9458864265e25415ae61586d500ff5fc/samples/gl-450-direct-state-access.cpp
 	//---------------------------------------------------
 	//		Create Compressed MipMapped Texture
 	//---------------------------------------------------
-	const auto texture_data = gli::texture2d(gli::load(
-		"D:/Downloads/SpeedTree_v2/SpeedTree_v2/White Oak/LowPoly/Textures/T_White_Oak_Leaves_Mobile_BaseColor.dds"));
+	const auto assetName = "Assets/great_husk_sentry.DDS";
+	const auto texture_data = gli::texture2d(gli::load(assetName));
 	gli::gl GL(gli::gl::PROFILE_GL33);
 	const auto format = GL.translate(texture_data.format(), texture_data.swizzles());
 	const auto mips = texture_data.levels();
@@ -108,24 +107,21 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	const auto height = texture_data.extent().y;
 
 	GLuint texture_handle;
-	glGenTextures(1, &texture_handle);
-
-	glBindTexture(GL_TEXTURE_2D, texture_handle);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, GLint(mips - 1));
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mips == 1 ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
+	glCreateTextures(GL_TEXTURE_2D, 1, &texture_handle);
+	glObjectLabel(GL_TEXTURE, texture_handle, glLabel(assetName));
+	glTextureParameteri(texture_handle, GL_TEXTURE_BASE_LEVEL, 0);
+	glTextureParameteri(texture_handle, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(mips - 1));
+	glTextureParameteri(texture_handle, GL_TEXTURE_MIN_FILTER, mips == 1 ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR);
+	glTextureParameteri(texture_handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTextureStorage2D(texture_handle, static_cast<GLint>(mips), format.Internal, width, height);
 	for (auto i = 0; i < mips; i++)
 	{
-		glCompressedTexImage2D(GL_TEXTURE_2D, GLint(i), format.Internal,
-							   static_cast<GLsizei>(texture_data[i].extent().x),
-							   static_cast<GLsizei>(texture_data[i].extent().y), 0,
-							   static_cast<GLsizei>(texture_data[i].size()), texture_data[i].data());
+		glCompressedTextureSubImage2D(texture_handle, static_cast<GLint>(i), 0, 0,
+									  static_cast<GLsizei>(texture_data[i].extent().x),
+									  static_cast<GLsizei>(texture_data[i].extent().y), format.Internal,
+									  static_cast<GLsizei>(texture_data[i].size()), texture_data[i].data());
 	}
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, 0);
 	//---------------------------------------------------
 
 	auto windowWidth = 0;
@@ -133,36 +129,29 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 
 	GLuint spriteFramebufferColorTexture;
-	glGenTextures(1, &spriteFramebufferColorTexture);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, spriteFramebufferColorTexture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-	glTexImage2D(GL_TEXTURE_2D, GLint(0), GL_RGBA8, GLsizei(windowWidth), GLsizei(windowHeight), 0, GL_RGBA,
-				 GL_UNSIGNED_BYTE, NULL);
+	glCreateTextures(GL_TEXTURE_2D, 1, &spriteFramebufferColorTexture);
+	glTextureParameteri(spriteFramebufferColorTexture, GL_TEXTURE_BASE_LEVEL, 0);
+	glTextureParameteri(spriteFramebufferColorTexture, GL_TEXTURE_MAX_LEVEL, 0);
+	glTextureStorage2D(spriteFramebufferColorTexture, 1, GL_RGBA8, static_cast<GLsizei>(windowWidth),
+					   static_cast<GLsizei>(windowHeight));
+	glObjectLabel(GL_TEXTURE, spriteFramebufferColorTexture, glLabel("sprites_color_render_target"));
 
 	GLuint spriteFramebufferDepthTexture;
-	glGenTextures(1, &spriteFramebufferDepthTexture);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, spriteFramebufferDepthTexture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-	glTexImage2D(GL_TEXTURE_2D, GLint(0), GL_DEPTH_COMPONENT24, GLsizei(windowWidth), GLsizei(windowHeight), 0,
-				 GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
+	glCreateTextures(GL_TEXTURE_2D, 1, &spriteFramebufferDepthTexture);
+	glTextureParameteri(spriteFramebufferDepthTexture, GL_TEXTURE_BASE_LEVEL, 0);
+	glTextureParameteri(spriteFramebufferDepthTexture, GL_TEXTURE_MAX_LEVEL, 0);
+	glTextureStorage2D(spriteFramebufferDepthTexture, 1, GL_DEPTH_COMPONENT32F, static_cast<GLsizei>(windowWidth),
+					   static_cast<GLsizei>(windowHeight));
+	glObjectLabel(GL_TEXTURE, spriteFramebufferColorTexture, glLabel("sprites_depth_render_target"));
 
 
 	GLuint spriteRendererFramebuffer;
-	glGenFramebuffers(1, &spriteRendererFramebuffer);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, spriteRendererFramebuffer);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, spriteFramebufferColorTexture, 0);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, spriteFramebufferDepthTexture, 0);
-	const auto buffersRender = GLenum{ GL_COLOR_ATTACHMENT0 };
-	glDrawBuffers(1, &buffersRender);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+	glCreateFramebuffers(1, &spriteRendererFramebuffer);
+	glObjectLabel(GL_FRAMEBUFFER, spriteRendererFramebuffer, glLabel("sprites_fb"));
+	glNamedFramebufferTexture(spriteRendererFramebuffer, GL_COLOR_ATTACHMENT0, spriteFramebufferColorTexture, 0);
+	glNamedFramebufferTexture(spriteRendererFramebuffer, GL_DEPTH_ATTACHMENT, spriteFramebufferDepthTexture, 0);
 	//---------------------------------------------------------------
+
 	const auto vertexShaderCode = R"(#
 	#version 460
 
@@ -207,14 +196,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	const auto sourcesFrag = std::array{ fragmentShaderCode };
 
 	GLuint fooVertProgram = glCreateShaderProgramv(GL_VERTEX_SHADER, 1, sourcesVert.data());
-	GLint t;
+	glObjectLabel(GL_PROGRAM, fooVertProgram, glLabel("vs_01"));
 	GLuint fooFragProgram = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, sourcesFrag.data());
+	glObjectLabel(GL_PROGRAM, fooVertProgram, glLabel("fs_01"));
+
 
 	GLuint fooPipeline;
-	glGenProgramPipelines(1, &fooPipeline);
-
-	glBindProgramPipeline(fooPipeline);
-
+	glCreateProgramPipelines(1, &fooPipeline);
+	glObjectLabel(GL_PROGRAM_PIPELINE, fooVertProgram, glLabel("pipeline_01"));
 	glUseProgramStages(fooPipeline, GL_VERTEX_SHADER_BIT, fooVertProgram);
 	glUseProgramStages(fooPipeline, GL_FRAGMENT_SHADER_BIT, fooFragProgram);
 
@@ -226,35 +215,35 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	};
 	auto quadData = std::array{
 		QuadVertex{ { 0.0, 0.0 }, { 0.0, 0.0 } },
-		QuadVertex{ { 0.5, 0.0 }, { 1.0, 0.0 } },
-		QuadVertex{ { 0.5, 0.5 }, { 1.0, 1.0 } },
-		QuadVertex{ { 0.0, 0.5 }, { 0.0, 1.0 } },
+		QuadVertex{ { 1.0, 0.0 }, { 1.0, 0.0 } },
+		QuadVertex{ { 1.0, 1.0 }, { 1.0, 1.0 } },
+		QuadVertex{ { 0.0, 0.0 }, { 0.0, 0.0 } },
+		QuadVertex{ { 1.0, 1.0 }, { 1.0, 1.0 } },
+		QuadVertex{ { 0.0, 1.0 }, { 0.0, 1.0 } },
 	};
 
 	GLuint vertexBuffer;
-	glGenBuffers(1, &vertexBuffer);
-
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(QuadVertex) * quadData.size(), quadData.data(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glCreateBuffers(1, &vertexBuffer);
+	glObjectLabel(GL_BUFFER, vertexBuffer, glLabel("vertex_buffer_01"));
+	glNamedBufferStorage(vertexBuffer, sizeof(QuadVertex) * quadData.size(), quadData.data(), 0);
 
 	GLuint fooVertexArray;
 	glCreateVertexArrays(1, &fooVertexArray);
-
+	glObjectLabel(GL_VERTEX_ARRAY, fooVertexArray, glLabel("vao_01"));
 	const GLuint positionAttribute = 0;
 	const GLuint texcoordAttribute = 1;
 
+	glVertexArrayVertexBuffer(fooVertexArray, 0, vertexBuffer, 0, sizeof(QuadVertex));
 
-	glVertexArrayAttribBinding(fooVertexArray, positionAttribute, 0);
-	glVertexArrayAttribFormat(fooVertexArray, positionAttribute, 2, GL_FLOAT, GL_FALSE, 0);
 	glEnableVertexArrayAttrib(fooVertexArray, positionAttribute);
+	glVertexArrayAttribBinding(fooVertexArray, positionAttribute, 0);
+	glVertexArrayAttribFormat(fooVertexArray, positionAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex, position));
 
-
-	glVertexArrayAttribBinding(fooVertexArray, texcoordAttribute, 0);
-	glVertexArrayAttribFormat(fooVertexArray, texcoordAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2));
 	glEnableVertexArrayAttrib(fooVertexArray, texcoordAttribute);
+	glVertexArrayAttribBinding(fooVertexArray, texcoordAttribute, 0);
+	glVertexArrayAttribFormat(fooVertexArray, texcoordAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex, uv));
 
-	
+
 	// Main loop
 	bool done = false;
 
@@ -285,36 +274,31 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 			ImGui::ShowDemoWindow(&show_demo_window);
 
 
-		ImGui::Image((ImTextureID)texture_handle, ImVec2{ 400, 400 });
+		ImGui::Image((ImTextureID)texture_handle, ImVec2{ width / 8.0f, height / 8.0f });
+		ImGui::SameLine();
+		ImGui::Image((ImTextureID)spriteFramebufferColorTexture, ImVec2{ windowWidth / 4.0f, windowHeight / 4.0f });
 
 		ImGui::Render();
 
-		// glBindFramebuffer(GL_FRAMEBUFFER, spriteRendererFramebuffer);
-		glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-		glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w,
-					 clear_color.w);
-		glClearDepth(0.5f);
-		glBindProgramPipeline(fooPipeline);
-		{
-			const auto error = glGetError();
-			std::println("GL Error: {}", error);
-		}
-		glBindVertexArray(fooVertexArray);
-		{
-			const auto error = glGetError();
-			std::println("GL Error: {}", error);
-		}
+		//---------PASS--------------------------------
+		glViewport(0, 0, windowWidth, windowHeight);
+		glClipControl(GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE);
+		glFrontFace(GL_CCW);
+		glCullFace(GL_BACK);
 
-		glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 3, 1, 0);
-		{
-			const auto error = glGetError();
-			std::println("GL Error: {}", error);
-		}
-		glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	{
-		const auto error = glGetError();
-		std::println("GL Error: {}", error);
-	}
+		glEnable(GL_CULL_FACE);
+
+		const auto colorClearValue = std::array{ 1.0f, 1.0f, 1.0f, 0.0f };
+		glClearNamedFramebufferfv(spriteRendererFramebuffer, GL_COLOR, 0, colorClearValue.data());
+		glClearNamedFramebufferfi(spriteRendererFramebuffer, GL_DEPTH_STENCIL, 0, 0.0f, 0);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, spriteRendererFramebuffer);
+		glBindProgramPipeline(fooPipeline);
+		glBindVertexArray(fooVertexArray);
+		// TODO:glBindTextureUnit, glBindSamplers, glBindBufferRange for uniforms
+		glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 6, 1, 0);
+		//---------------------------------------------
+
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
@@ -329,6 +313,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplSDL3_Shutdown();
 	ImGui::DestroyContext();
+
+
+	glDeleteProgramPipelines(1, &fooPipeline);
+	glDeleteBuffers(1, &vertexBuffer);
+	glDeleteProgram(fooVertProgram);
+	glDeleteProgram(fooFragProgram);
+	glDeleteTextures(1, &texture_handle);
+	glDeleteTextures(1, &spriteFramebufferColorTexture);
+	glDeleteTextures(1, &spriteFramebufferDepthTexture);
+	glDeleteFramebuffers(1, &spriteRendererFramebuffer);
+	glDeleteVertexArrays(1, &fooVertexArray);
 
 	SDL_GL_DestroyContext(gl_context);
 	SDL_DestroyWindow(window);
