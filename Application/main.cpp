@@ -20,6 +20,8 @@
 #include <variant>
 #include <vector>
 
+#include "SpriteBatch.hpp"
+
 void __stdcall MessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
 							   const GLchar* message, const void* userParam)
 {
@@ -336,6 +338,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
 	layout(location = 0) in vec2 Position;
 	layout(location = 1) in vec2 Texcoord;
+	layout(location = 2) in vec3 Color;
 
 	out gl_PerVertex
 	{
@@ -363,6 +366,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 		vec2 Texcoord;
 	} In;
 
+	uniform sampler2D texture;
 	layout(location = 0) out vec4 Color;
 
 	void main()
@@ -406,24 +410,24 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	glNamedBufferStorage(vertexBuffer, sizeof(QuadVertex) * quadData.size(), quadData.data(), 0);
 	//------------------------------------
 
-	GLuint fooVertexArray;
-	glCreateVertexArrays(1, &fooVertexArray);
-	glObjectLabel(GL_VERTEX_ARRAY, fooVertexArray, glLabel("vao_01"));
-	const GLuint positionAttribute = 0;
-	const GLuint texcoordAttribute = 1;
+	//GLuint fooVertexArray;
+	//glCreateVertexArrays(1, &fooVertexArray);
+	//glObjectLabel(GL_VERTEX_ARRAY, fooVertexArray, glLabel("vao_01"));
+	//const GLuint positionAttribute = 0;
+	//const GLuint texcoordAttribute = 1;
 
-	//------------------------------------
-	// TODO: per frame vertex generation
-	glVertexArrayVertexBuffer(fooVertexArray, 0, vertexBuffer, 0, sizeof(QuadVertex));
-	//------------------------------------
+	////------------------------------------
+	//// TODO: per frame vertex generation
+	//glVertexArrayVertexBuffer(fooVertexArray, 0, vertexBuffer, 0, sizeof(QuadVertex));
+	////------------------------------------
 
-	glEnableVertexArrayAttrib(fooVertexArray, positionAttribute);
-	glVertexArrayAttribBinding(fooVertexArray, positionAttribute, 0);
-	glVertexArrayAttribFormat(fooVertexArray, positionAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex, position));
+	//glEnableVertexArrayAttrib(fooVertexArray, positionAttribute);
+	//glVertexArrayAttribBinding(fooVertexArray, positionAttribute, 0);
+	//glVertexArrayAttribFormat(fooVertexArray, positionAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex, position));
 
-	glEnableVertexArrayAttrib(fooVertexArray, texcoordAttribute);
-	glVertexArrayAttribBinding(fooVertexArray, texcoordAttribute, 0);
-	glVertexArrayAttribFormat(fooVertexArray, texcoordAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex, uv));
+	//glEnableVertexArrayAttrib(fooVertexArray, texcoordAttribute);
+	//glVertexArrayAttribBinding(fooVertexArray, texcoordAttribute, 0);
+	//glVertexArrayAttribFormat(fooVertexArray, texcoordAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex, uv));
 
 
 	auto animationGraph = AnimationGraph{};
@@ -452,6 +456,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	auto characterAnimationSequence = AnimationSequence{};
 
 	auto player = AnimationPlayer{};
+
+	SpriteBatch spriteBatch;
+	SpriteTexture texture1;
+	SpriteTexture texture2;
 
 	// Main loop
 	bool done = false;
@@ -534,6 +542,27 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
 		const auto uv1 = (srcRect.position + srcRect.extent) / glm::vec2{ width, height };
 
+
+		spriteBatch.Begin();
+
+		/*	if (animationKey.flip == FrameFlip::horizontal)
+			{
+				spriteBatch.Draw(texture1, glm::vec2{ 0.0f, 0.0f });
+			}
+			else
+			{
+				spriteBatch.Draw(texture2, glm::vec2{ 0.0f, 0.0f }, Colors::Black);
+			}*/
+		spriteBatch.Draw(texture1, glm::vec2{ 0.1f, 0.0f });
+
+		spriteBatch.Draw(texture2, glm::vec2{ 0.2f, .2f }, Colors::Black);
+
+
+		spriteBatch.Draw(texture1, glm::vec2{ 0.3f, .3f });
+
+		spriteBatch.End();
+
+
 		if (animationKey.flip == FrameFlip::horizontal)
 		{
 			ImGui::Image((ImTextureID)texture_handle, ImVec2{ srcRect.extent.x, srcRect.extent.y },
@@ -567,9 +596,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
 		glBindFramebuffer(GL_FRAMEBUFFER, spriteRendererFramebuffer);
 		glBindProgramPipeline(fooPipeline);
-		glBindVertexArray(fooVertexArray);
+		glBindVertexArray(spriteBatch.vertexArrayObject);
 		// TODO:glBindTextureUnit, glBindSamplers, glBindBufferRange for uniforms
-		glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 6, 1, 0);
+		glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 6*3, 1, 0);
 		//---------------------------------------------
 
 
@@ -596,7 +625,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	glDeleteTextures(1, &spriteFramebufferColorTexture);
 	glDeleteTextures(1, &spriteFramebufferDepthTexture);
 	glDeleteFramebuffers(1, &spriteRendererFramebuffer);
-	glDeleteVertexArrays(1, &fooVertexArray);
+	//glDeleteVertexArrays(1, &fooVertexArray);
 
 	SDL_GL_DestroyContext(gl_context);
 	SDL_DestroyWindow(window);
