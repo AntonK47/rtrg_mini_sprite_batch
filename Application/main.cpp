@@ -20,6 +20,8 @@
 #include <variant>
 #include <vector>
 
+#include "Common.hpp"
+#include "RenderContext.hpp"
 #include "SpriteBatch.hpp"
 
 void __stdcall MessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
@@ -28,8 +30,6 @@ void __stdcall MessageCallback(GLenum source, GLenum type, GLuint id, GLenum sev
 	std::println(stderr, "GL debug message: {} type = 0x{}, severity = 0x{}, message = {}\n",
 				 (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
 }
-
-#define glLabel(s) (GLuint) strlen(s), s
 
 struct Rectangle
 {
@@ -268,11 +268,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	ImGui::StyleColorsDark();
 	ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init(glsl_version);
+	auto windowWidth = 0;
+	auto windowHeight = 0;
+	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+	auto renderContext = RenderContext{ static_cast<u32>(windowWidth), static_cast<u32>(windowHeight) };
 
 	// Our state
 	bool show_demo_window = true;
 	bool show_another_window = false;
-	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+	ImVec4 clear_color = ImVec4(100.0f / 255.f, 149.f / 255.f, 237.f / 255.f, 1.00f);
 
 	// OPENGL DSA example:
 	// https://github.com/g-truc/ogl-samples/blob/38cada7a9458864265e25415ae61586d500ff5fc/samples/gl-450-direct-state-access.cpp
@@ -305,32 +309,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
 	//---------------------------------------------------
 
-	auto windowWidth = 0;
-	auto windowHeight = 0;
-	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-
-	GLuint spriteFramebufferColorTexture;
-	glCreateTextures(GL_TEXTURE_2D, 1, &spriteFramebufferColorTexture);
-	glTextureParameteri(spriteFramebufferColorTexture, GL_TEXTURE_BASE_LEVEL, 0);
-	glTextureParameteri(spriteFramebufferColorTexture, GL_TEXTURE_MAX_LEVEL, 0);
-	glTextureStorage2D(spriteFramebufferColorTexture, 1, GL_RGBA8, static_cast<GLsizei>(windowWidth),
-					   static_cast<GLsizei>(windowHeight));
-	glObjectLabel(GL_TEXTURE, spriteFramebufferColorTexture, glLabel("sprites_color_render_target"));
-
-	GLuint spriteFramebufferDepthTexture;
-	glCreateTextures(GL_TEXTURE_2D, 1, &spriteFramebufferDepthTexture);
-	glTextureParameteri(spriteFramebufferDepthTexture, GL_TEXTURE_BASE_LEVEL, 0);
-	glTextureParameteri(spriteFramebufferDepthTexture, GL_TEXTURE_MAX_LEVEL, 0);
-	glTextureStorage2D(spriteFramebufferDepthTexture, 1, GL_DEPTH_COMPONENT32F, static_cast<GLsizei>(windowWidth),
-					   static_cast<GLsizei>(windowHeight));
-	glObjectLabel(GL_TEXTURE, spriteFramebufferColorTexture, glLabel("sprites_depth_render_target"));
-
-
-	GLuint spriteRendererFramebuffer;
-	glCreateFramebuffers(1, &spriteRendererFramebuffer);
-	glObjectLabel(GL_FRAMEBUFFER, spriteRendererFramebuffer, glLabel("sprites_fb"));
-	glNamedFramebufferTexture(spriteRendererFramebuffer, GL_COLOR_ATTACHMENT0, spriteFramebufferColorTexture, 0);
-	glNamedFramebufferTexture(spriteRendererFramebuffer, GL_DEPTH_ATTACHMENT, spriteFramebufferDepthTexture, 0);
+	auto spriteBatchFramebuffer = renderContext.CreateFramebuffer(FramebufferDescriptor{
+		.colorAttachment = { Texture2DDescriptor{
+			.extent = DynamicExtent{}, .format = TextureFormat::rgba8, .debugName = "sprites_color_render_target" } },
+		.depthAttachment = Texture2DDescriptor{ .extent = DynamicExtent{},
+												.format = TextureFormat::d32f,
+												.debugName = "sprites_depth_render_target" },
+		.debugName = "sprites_fb" });
 	//---------------------------------------------------------------
 
 	const auto vertexShaderCode = R"(#
@@ -410,24 +395,26 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	glNamedBufferStorage(vertexBuffer, sizeof(QuadVertex) * quadData.size(), quadData.data(), 0);
 	//------------------------------------
 
-	//GLuint fooVertexArray;
-	//glCreateVertexArrays(1, &fooVertexArray);
-	//glObjectLabel(GL_VERTEX_ARRAY, fooVertexArray, glLabel("vao_01"));
-	//const GLuint positionAttribute = 0;
-	//const GLuint texcoordAttribute = 1;
+	// GLuint fooVertexArray;
+	// glCreateVertexArrays(1, &fooVertexArray);
+	// glObjectLabel(GL_VERTEX_ARRAY, fooVertexArray, glLabel("vao_01"));
+	// const GLuint positionAttribute = 0;
+	// const GLuint texcoordAttribute = 1;
 
 	////------------------------------------
 	//// TODO: per frame vertex generation
-	//glVertexArrayVertexBuffer(fooVertexArray, 0, vertexBuffer, 0, sizeof(QuadVertex));
+	// glVertexArrayVertexBuffer(fooVertexArray, 0, vertexBuffer, 0, sizeof(QuadVertex));
 	////------------------------------------
 
-	//glEnableVertexArrayAttrib(fooVertexArray, positionAttribute);
-	//glVertexArrayAttribBinding(fooVertexArray, positionAttribute, 0);
-	//glVertexArrayAttribFormat(fooVertexArray, positionAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex, position));
+	// glEnableVertexArrayAttrib(fooVertexArray, positionAttribute);
+	// glVertexArrayAttribBinding(fooVertexArray, positionAttribute, 0);
+	// glVertexArrayAttribFormat(fooVertexArray, positionAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex,
+	// position));
 
-	//glEnableVertexArrayAttrib(fooVertexArray, texcoordAttribute);
-	//glVertexArrayAttribBinding(fooVertexArray, texcoordAttribute, 0);
-	//glVertexArrayAttribFormat(fooVertexArray, texcoordAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex, uv));
+	// glEnableVertexArrayAttrib(fooVertexArray, texcoordAttribute);
+	// glVertexArrayAttribBinding(fooVertexArray, texcoordAttribute, 0);
+	// glVertexArrayAttribFormat(fooVertexArray, texcoordAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex,
+	// uv));
 
 
 	auto animationGraph = AnimationGraph{};
@@ -464,6 +451,81 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	// Main loop
 	bool done = false;
 
+	/*====================================================================================*/
+	/*====================================================================================*/
+
+	GLuint fullscreenQuadPipeline;
+	{
+		const auto vertexShaderCode1 = R"(
+	#version 460
+
+	out gl_PerVertex
+	{
+		vec4 gl_Position;
+	};
+
+	void main()
+	{	
+		gl_Position = gl_Position = vec4(4.f * (gl_VertexID % 2) - 1.f, 4.f * (gl_VertexID / 2) - 1.f, 0.0, 1.0);
+	}
+	)";
+
+		const auto fragmentShaderCode1 = R"(
+	#version 460
+
+	layout(binding = 0) uniform sampler2D basicTexture;
+
+	layout(location = 0, index = 0) out vec4 color;
+
+	void main()
+	{
+		vec2 textureSize = vec2(textureSize(basicTexture, 0));
+
+		color = texture(basicTexture, gl_FragCoord.xy / textureSize);
+	}
+)";
+
+
+		auto validateProgram = [](GLuint program)
+		{
+			int success;
+			glGetProgramiv(program, GL_LINK_STATUS, &success);
+			if (!success)
+			{
+				char infoLog[512];
+				glGetProgramInfoLog(program, 512, NULL, infoLog);
+				std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+			}
+		};
+
+		const auto sourcesVert1 = std::array{ vertexShaderCode1 };
+		const auto sourcesFrag1 = std::array{ fragmentShaderCode1 };
+
+		GLuint fooVertProgram1 = glCreateShaderProgramv(GL_VERTEX_SHADER, 1, sourcesVert1.data());
+		glObjectLabel(GL_PROGRAM, fooVertProgram1, glLabel("vs_01"));
+		GLuint fooFragProgram1 = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, sourcesFrag1.data());
+		glObjectLabel(GL_PROGRAM, fooVertProgram1, glLabel("fs_01"));
+
+
+		glCreateProgramPipelines(1, &fullscreenQuadPipeline);
+		// glObjectLabel(GL_PROGRAM_PIPELINE, fooVertProgram1, glLabel("fullscreenQuadPipeline"));
+		glUseProgramStages(fullscreenQuadPipeline, GL_VERTEX_SHADER_BIT, fooVertProgram1);
+		glUseProgramStages(fullscreenQuadPipeline, GL_FRAGMENT_SHADER_BIT, fooFragProgram1);
+
+		renderContext.CreateGraphicsPipeline(
+			GraphicsPipelineDescriptor{ .vertexShaderCode = { vertexShaderCode1, "vs_01" },
+										.fragmentSchaderCode = { fragmentShaderCode1, "fs_01" },
+										.debugName = "fullscreenQuadPipeline" });
+
+		validateProgram(fooVertProgram1);
+		validateProgram(fooFragProgram1);
+	}
+
+
+	/*====================================================================================*/
+	/*====================================================================================*/
+
+
 	while (!done)
 	{
 		SDL_Event event;
@@ -474,6 +536,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 				done = true;
 			if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window))
 				done = true;
+
+			if (event.type == SDL_EVENT_WINDOW_RESIZED)
+			{
+				uint32_t newWidth;
+				uint32_t newHeight;
+				SDL_GetWindowSize(window, (int*)&newWidth, (int*)&newHeight);
+				renderContext.windowContext.UpdateSize(newWidth, newHeight);
+			}
 		}
 		if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)
 		{
@@ -577,8 +647,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
 		ImGui::Image((ImTextureID)texture_handle, ImVec2{ width / 8.0f, height / 8.0f });
 		ImGui::SameLine();
-		ImGui::Image((ImTextureID)spriteFramebufferColorTexture, ImVec2{ windowWidth / 4.0f, windowHeight / 4.0f });
 
+		const auto spriteFramebuffer = renderContext.Get(spriteBatchFramebuffer);
+		const auto spriteColorTexture = renderContext.Get(spriteFramebuffer.colorAttachment[0]);
+		const auto spriteDepthTexture = renderContext.Get(spriteFramebuffer.depthAttachment.value());
+
+		ImGui::Image((ImTextureID)spriteColorTexture.nativeHandle, ImVec2{ windowWidth / 4.0f, windowHeight / 4.0f });
 
 		ImGui::Render();
 
@@ -591,14 +665,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 		glEnable(GL_CULL_FACE);
 
 		const auto colorClearValue = std::array{ 1.0f, 1.0f, 1.0f, 0.0f };
-		glClearNamedFramebufferfv(spriteRendererFramebuffer, GL_COLOR, 0, colorClearValue.data());
-		glClearNamedFramebufferfi(spriteRendererFramebuffer, GL_DEPTH_STENCIL, 0, 0.0f, 0);
+		glClearNamedFramebufferfv(spriteFramebuffer.nativeHandle, GL_COLOR, 0, colorClearValue.data());
+		glClearNamedFramebufferfi(spriteFramebuffer.nativeHandle, GL_DEPTH_STENCIL, 0, 0.0f, 0);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, spriteRendererFramebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, spriteFramebuffer.nativeHandle);
+
+		auto result = glCheckNamedFramebufferStatus(spriteFramebuffer.nativeHandle, GL_FRAMEBUFFER);
+
+
 		glBindProgramPipeline(fooPipeline);
 		glBindVertexArray(spriteBatch.vertexArrayObject);
 		// TODO:glBindTextureUnit, glBindSamplers, glBindBufferRange for uniforms
-		glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 6*3, 1, 0);
+		glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 6 * 3, 1, 0);
 		//---------------------------------------------
 
 
@@ -607,6 +685,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 		glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w,
 					 clear_color.w);
 		glClear(GL_COLOR_BUFFER_BIT);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glBindProgramPipeline(fullscreenQuadPipeline);
+		glBindTextureUnit(0, spriteColorTexture.nativeHandle);
+
+		glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 3, 1, 0);
+		glDisable(GL_BLEND);
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		SDL_GL_SwapWindow(window);
 	}
@@ -622,10 +707,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	glDeleteProgram(fooVertProgram);
 	glDeleteProgram(fooFragProgram);
 	glDeleteTextures(1, &texture_handle);
-	glDeleteTextures(1, &spriteFramebufferColorTexture);
-	glDeleteTextures(1, &spriteFramebufferDepthTexture);
-	glDeleteFramebuffers(1, &spriteRendererFramebuffer);
-	//glDeleteVertexArrays(1, &fooVertexArray);
+	renderContext.DestroyFramebuffer(spriteBatchFramebuffer);
 
 	SDL_GL_DestroyContext(gl_context);
 	SDL_DestroyWindow(window);

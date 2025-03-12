@@ -8,7 +8,7 @@ find_package(gli CONFIG REQUIRED)
 add_executable(${APPLICATION_NAME})
 target_compile_features(${APPLICATION_NAME} PUBLIC cxx_std_23)
 target_sources(${APPLICATION_NAME} PRIVATE 
-	main.cpp SpriteBatch.cpp)
+	main.cpp SpriteBatch.cpp RenderContext.cpp)
 target_link_libraries(
 	${APPLICATION_NAME} 
 PRIVATE 
