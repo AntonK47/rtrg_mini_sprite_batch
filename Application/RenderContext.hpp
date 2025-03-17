@@ -55,8 +55,8 @@ struct StaticExtent
 
 struct DynamicExtent
 {
-	float scaleWidth{ 1.0f };
-	float scaleHeight{ 1.0f };
+	f32 scaleWidth{ 1.0f };
+	f32 scaleHeight{ 1.0f };
 };
 
 using Extent = std::variant<StaticExtent, DynamicExtent>;
@@ -147,8 +147,8 @@ private:
 	void DestroyOpenGlFramebuffer(const Framebuffer& framebuffer);
 
 	WindowContext windowContext;
-	// TODO: Maybe better resource managment, for example by using pools, resource invalidation, decoupled resouce
-	// managment class/struct
+	// TODO: Maybe better resource management, for example by using pools, resource invalidation, decoupled resource
+	// management class/struct
 	std::unordered_map<FramebufferHandle, Framebuffer> framebuffers;
 	std::unordered_map<FramebufferHandle, WindowSizeDependentFramebuffer> windowSizeDependentFramebuffers;
 	std::unordered_map<Texture2DHandle, Texture2D> textures;

@@ -99,23 +99,23 @@ void RenderContext::RecreateWindowSizeDependentResources()
 
 Texture2DHandle RenderContext::CreateTexture2D(const Texture2DDescriptor& descriptor)
 {
-	u32 width;
-	u32 height;
+	auto width = u32{};
+	auto height = u32{};
 	const auto isDynamicExtent = std::holds_alternative<DynamicExtent>(descriptor.extent);
 	if (isDynamicExtent)
 	{
-		const auto extentScales = std::get<DynamicExtent>(descriptor.extent);
+		const auto& extentScales = std::get<DynamicExtent>(descriptor.extent);
 		width = static_cast<u32>(windowContext.width * extentScales.scaleWidth);
 		height = static_cast<u32>(windowContext.height * extentScales.scaleHeight);
 	}
 	else
 	{
-		const auto extent = std::get<StaticExtent>(descriptor.extent);
+		const auto& extent = std::get<StaticExtent>(descriptor.extent);
 		width = extent.width;
 		height = extent.height;
 	}
 
-	Texture2D texture;
+	auto texture = Texture2D{};
 	glCreateTextures(GL_TEXTURE_2D, 1, &texture.nativeHandle);
 	glTextureParameteri(texture.nativeHandle, GL_TEXTURE_BASE_LEVEL, 0);
 	glTextureParameteri(texture.nativeHandle, GL_TEXTURE_MAX_LEVEL, 0);
@@ -123,7 +123,7 @@ Texture2DHandle RenderContext::CreateTexture2D(const Texture2DDescriptor& descri
 					   static_cast<GLsizei>(height));
 	glObjectLabel(GL_TEXTURE, texture.nativeHandle, glLabel(descriptor.debugName));
 
-	Texture2DHandle texture2DHandle;
+	auto texture2DHandle = Texture2DHandle{};
 	texture2DHandle.key = GenerateKey();
 	textures[texture2DHandle] = texture;
 	return texture2DHandle;
@@ -131,10 +131,9 @@ Texture2DHandle RenderContext::CreateTexture2D(const Texture2DDescriptor& descri
 
 FramebufferHandle RenderContext::CreateFramebuffer(const FramebufferDescriptor& descriptor)
 {
-	Framebuffer framebuffer = CreateOpenGlFramebuffer(descriptor);
+	const auto framebuffer = CreateOpenGlFramebuffer(descriptor);
 
-
-	FramebufferHandle handle;
+	auto handle = FramebufferHandle{};
 	handle.key = GenerateKey();
 
 	if (framebuffer.isSizeDependent)

@@ -1,26 +1,23 @@
 #include <SDL3/SDL.h>
-#include <glad/glad.h>
-#include <imgui.h>
-#include <imgui_impl_opengl3.h>
-#include <imgui_impl_sdl3.h>
+
 #define TINYDDS_IMPLEMENTATION
+#include <gli/gli.hpp>
 #include <tinydds.h>
 
-#include <gli/gli.hpp>
-
 #include <array>
-#include <fstream>
-#include <print>
-
 #include <assert.h>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
+#include <print>
 #include <regex>
 #include <stack>
 #include <variant>
 #include <vector>
 
+#include "Animation.hpp"
 #include "Common.hpp"
+#include "ImGui.hpp"
 #include "RenderContext.hpp"
 #include "SpriteBatch.hpp"
 
@@ -30,168 +27,6 @@ void __stdcall MessageCallback(GLenum source, GLenum type, GLuint id, GLenum sev
 	std::println(stderr, "GL debug message: {} type = 0x{}, severity = 0x{}, message = {}\n",
 				 (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
 }
-
-struct Rectangle
-{
-	glm::vec2 position;
-	glm::vec2 extent;
-};
-
-struct AnimationFrame
-{
-	Rectangle sourceSprite;
-	glm::vec2 root;
-};
-
-enum class AnimationRepeat
-{
-	once,
-	loop
-};
-
-struct Animation
-{
-	std::string name;
-	u32 animationIndex;
-	u32 animationFrameCount;
-	AnimationRepeat repeat{ AnimationRepeat::once };
-};
-
-enum class FrameFlip
-{
-	none,
-	horizontal
-};
-
-struct AnimationKey
-{
-	u32 frameIndex{ 0 };
-	u32 duration{ 1 };
-	FrameFlip flip{ FrameFlip::none };
-};
-
-static const auto animationFrames = std::array{
-	AnimationFrame{ { { 3, 22 }, { 316 - 3, 368 - 22 } }, { 131, 366 } },
-	AnimationFrame{ { { 320, 22 }, { 633 - 320, 368 - 22 } }, { 447, 365 } },
-	AnimationFrame{ { { 637, 22 }, { 950 - 637, 368 - 22 } }, { 764, 366 } },
-	AnimationFrame{ { { 954, 22 }, { 1267 - 954, 368 - 22 } }, { 1080, 366 } },
-	AnimationFrame{ { { 1271, 22 }, { 1584 - 1271, 368 - 22 } }, { 1958, 365 } },
-
-	AnimationFrame{ { { 3, 1098 }, { 304 - 3, 1452 - 1098 } }, { 118, 1447 } },
-	AnimationFrame{ { { 308, 1098 }, { 609 - 308, 1452 - 1098 } }, { 423, 1449 } },
-
-	AnimationFrame{ { { 3, 391 }, { 317 - 3, 731 - 391 } }, { 191, 725 } },
-	AnimationFrame{ { { 321, 391 }, { 635 - 321, 731 - 391 } }, { 491, 727 } },
-	AnimationFrame{ { { 639, 391 }, { 953 - 639, 731 - 391 } }, { 771, 730 } },
-	AnimationFrame{ { { 957, 391 }, { 1271 - 957, 731 - 391 } }, { 1062, 728 } },
-	AnimationFrame{ { { 1275, 391 }, { 1589 - 1275, 731 - 391 } }, { 1358, 725 } },
-	AnimationFrame{ { { 1593, 391 }, { 1907 - 1593, 731 - 391 } }, { 1673, 713 } },
-	AnimationFrame{ { { 3, 735 }, { 317 - 3, 1075 - 735 } }, { 0, 0 } },
-	AnimationFrame{ { { 321, 735 }, { 635 - 321, 1075 - 735 } }, { 0, 0 } },
-};
-
-static const auto animationSequences = std::array{
-	AnimationKey{ 0, 1, FrameFlip::none },		  AnimationKey{ 1, 1, FrameFlip::none },
-	AnimationKey{ 2, 1, FrameFlip::none },		  AnimationKey{ 3, 1, FrameFlip::none },
-	AnimationKey{ 4, 1, FrameFlip::none },		  AnimationKey{ 3, 1, FrameFlip::none },
-	AnimationKey{ 2, 1, FrameFlip::none },		  AnimationKey{ 1, 1, FrameFlip::none }, // Idle Right
-
-	AnimationKey{ 0, 1, FrameFlip::horizontal },  AnimationKey{ 1, 1, FrameFlip::horizontal },
-	AnimationKey{ 2, 1, FrameFlip::horizontal },  AnimationKey{ 3, 1, FrameFlip::horizontal },
-	AnimationKey{ 4, 1, FrameFlip::horizontal },  AnimationKey{ 3, 1, FrameFlip::horizontal },
-	AnimationKey{ 2, 1, FrameFlip::horizontal },  AnimationKey{ 1, 1, FrameFlip::horizontal }, // Idle Left
-
-	AnimationKey{ 5, 1, FrameFlip::none },		  AnimationKey{ 6, 1, FrameFlip::none }, // Turn Left
-	AnimationKey{ 5, 1, FrameFlip::horizontal },  AnimationKey{ 6, 1, FrameFlip::horizontal }, // Turn Right,
-
-	AnimationKey{ 7, 1, FrameFlip::none },		  AnimationKey{ 8, 1, FrameFlip::none },
-	AnimationKey{ 9, 1, FrameFlip::none },		  AnimationKey{ 10, 1, FrameFlip::none },
-	AnimationKey{ 11, 1, FrameFlip::none },		  AnimationKey{ 12, 1, FrameFlip::none },
-	AnimationKey{ 13, 1, FrameFlip::none },		  AnimationKey{ 14, 1, FrameFlip::none },
-
-	AnimationKey{ 7, 1, FrameFlip::horizontal },  AnimationKey{ 8, 1, FrameFlip::horizontal },
-	AnimationKey{ 9, 1, FrameFlip::horizontal },  AnimationKey{ 10, 1, FrameFlip::horizontal },
-	AnimationKey{ 11, 1, FrameFlip::horizontal }, AnimationKey{ 12, 1, FrameFlip::horizontal },
-	AnimationKey{ 13, 1, FrameFlip::horizontal }, AnimationKey{ 14, 1, FrameFlip::horizontal },
-};
-
-static const auto animations = std::array{
-	Animation{ "idle-right", 0, 8, AnimationRepeat::loop },	 Animation{ "idle-left", 8, 8, AnimationRepeat::loop },
-	Animation{ "turn-left", 16, 2, AnimationRepeat::once },	 Animation{ "turn-right", 18, 2, AnimationRepeat::once },
-	Animation{ "walk-right", 20, 8, AnimationRepeat::loop }, Animation{ "walk-left", 28, 8, AnimationRepeat::loop }
-};
-
-struct AnimationInstance
-{
-	u32 currentNodeIndex;
-	u32 key;
-};
-
-struct SequenceItem
-{
-	u32 node;
-	i32 key;
-
-	auto operator<=>(const SequenceItem&) const = default;
-};
-using AnimationSequence = std::vector<SequenceItem>;
-
-struct AnimationPlayer
-{
-	AnimationInstance ForwardAnimation(AnimationInstance instance, AnimationSequence& sequence);
-	void ForwardTime(const float deltaTime);
-
-	float localTime;
-	float frameDuration{ 0.016f };
-	bool nextKey{ false };
-};
-
-struct AnimationState
-{
-	std::string name;
-};
-
-struct AnimationTransition
-{
-	i32 key;
-	u32 nodeIndex;
-};
-
-struct SyncOnKey
-{
-	i32 key;
-};
-
-struct SyncOnLastFrame
-{
-};
-
-struct SyncImmediate
-{
-};
-
-namespace animation::sync
-{
-	inline constexpr SyncOnLastFrame lastFrame{};
-	inline constexpr SyncImmediate immediate{};
-
-} // namespace animation::sync
-
-using AnimationSyncBehavior = std::variant<SyncOnKey, SyncOnLastFrame, SyncImmediate>;
-
-struct AnimationGraph
-{
-	using AnimationIndex = u32;
-
-	void AddNode(const std::string& name, const AnimationIndex animationIndex);
-	void AddTransition(const std::string& from, const std::string& to,
-					   const AnimationSyncBehavior& syncBehavior = animation::sync::immediate);
-	AnimationIndex GetNodeIndex(const std::string& nodeName) const;
-	AnimationSequence FindAnimationSequence(const AnimationInstance& instance, const std::string& to);
-
-	std::unordered_map<std::string, AnimationIndex> nameToNodeIndexMap;
-	std::unordered_map<AnimationIndex, std::vector<AnimationTransition>> transitions;
-};
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
@@ -266,7 +101,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	auto renderContext = RenderContext{ static_cast<u32>(windowWidth), static_cast<u32>(windowHeight) };
 
 	// Our state
-	bool show_demo_window = true;
+	bool showDemoWindow = true;
 	bool show_another_window = false;
 	ImVec4 clear_color = ImVec4(100.0f / 255.f, 149.f / 255.f, 237.f / 255.f, 1.00f);
 
@@ -387,27 +222,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	glNamedBufferStorage(vertexBuffer, sizeof(QuadVertex) * quadData.size(), quadData.data(), 0);
 	//------------------------------------
 
-	// GLuint fooVertexArray;
-	// glCreateVertexArrays(1, &fooVertexArray);
-	// glObjectLabel(GL_VERTEX_ARRAY, fooVertexArray, glLabel("vao_01"));
-	// const GLuint positionAttribute = 0;
-	// const GLuint texcoordAttribute = 1;
-
-	////------------------------------------
-	//// TODO: per frame vertex generation
-	// glVertexArrayVertexBuffer(fooVertexArray, 0, vertexBuffer, 0, sizeof(QuadVertex));
-	////------------------------------------
-
-	// glEnableVertexArrayAttrib(fooVertexArray, positionAttribute);
-	// glVertexArrayAttribBinding(fooVertexArray, positionAttribute, 0);
-	// glVertexArrayAttribFormat(fooVertexArray, positionAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex,
-	// position));
-
-	// glEnableVertexArrayAttrib(fooVertexArray, texcoordAttribute);
-	// glVertexArrayAttribBinding(fooVertexArray, texcoordAttribute, 0);
-	// glVertexArrayAttribFormat(fooVertexArray, texcoordAttribute, 2, GL_FLOAT, GL_FALSE, offsetof(QuadVertex,
-	// uv));
-
 
 	auto animationGraph = AnimationGraph{};
 	for (auto i = 0; i < animations.size(); i++)
@@ -493,9 +307,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 		const auto sourcesVert1 = std::array{ vertexShaderCode1 };
 		const auto sourcesFrag1 = std::array{ fragmentShaderCode1 };
 
-		GLuint fooVertProgram1 = glCreateShaderProgramv(GL_VERTEX_SHADER, 1, sourcesVert1.data());
+		const auto fooVertProgram1 = glCreateShaderProgramv(GL_VERTEX_SHADER, 1, sourcesVert1.data());
 		glObjectLabel(GL_PROGRAM, fooVertProgram1, glLabel("vs_01"));
-		GLuint fooFragProgram1 = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, sourcesFrag1.data());
+		const auto fooFragProgram1 = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, sourcesFrag1.data());
 		glObjectLabel(GL_PROGRAM, fooVertProgram1, glLabel("fs_01"));
 
 
@@ -520,7 +334,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
 	while (!done)
 	{
-		SDL_Event event;
+		auto event = SDL_Event{};
 		while (SDL_PollEvent(&event))
 		{
 			ImGui_ImplSDL3_ProcessEvent(&event);
@@ -531,8 +345,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
 			if (event.type == SDL_EVENT_WINDOW_RESIZED)
 			{
-				u32 newWidth;
-				u32 newHeight;
+				auto newWidth = u32{};
+				auto newHeight = u32{};
 				SDL_GetWindowSize(window, (int*)&newWidth, (int*)&newHeight);
 				windowWidth = newWidth;
 				windowHeight = newHeight;
@@ -545,26 +359,16 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 			continue;
 		}
 
-		// Start the Dear ImGui frame
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplSDL3_NewFrame();
 		ImGui::NewFrame();
 
-
-		if (show_demo_window)
-			ImGui::ShowDemoWindow(&show_demo_window);
-
-		// static uint32_t frameIndex = 0;
-
+		if (showDemoWindow)
+		{
+			ImGui::ShowDemoWindow(&showDemoWindow);
+		}
 
 		ImGui::SliderFloat("frame duration", &player.frameDuration, 0.01f, 1.0f);
-		/*static auto currentAnimation = 0;
-		auto animationName = [](void* userData, int idx) -> const char* { return animations[idx].name.c_str(); };*/
-		/*if (ImGui::ListBox("##listbox", &currentAnimation, animationName, nullptr, animations.size(), 4))
-		{
-			frameIndex = 0;
-			localTime = 0.0f;
-		}*/
 
 		if (ImGui::Button("switch to walk right"))
 		{
@@ -574,7 +378,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 		{
 			characterAnimationSequence = animationGraph.FindAnimationSequence(characterAnimationInstance, "walk-left");
 		}
-		if (ImGui::Button("swith to idle"))
+		if (ImGui::Button("switch to idle"))
 		{
 			if (std::regex_match(animations[characterAnimationInstance.currentNodeIndex].name,
 								 std::regex{ "[a-z]+\\-right" }))
@@ -595,59 +399,38 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
 
 		const auto& animation = animations[characterAnimationInstance.currentNodeIndex];
-
-
-		const auto animationKey = animationSequences[animation.animationIndex + characterAnimationInstance.key];
+		const auto& animationKey = animationSequences[animation.animationIndex + characterAnimationInstance.key];
 		const auto& frame = animationFrames[animationKey.frameIndex];
 
-
 		const auto srcRect = frame.sourceSprite;
-		const auto uv0 = (srcRect.position) / glm::vec2{ width, height };
-
-		const auto uv1 = (srcRect.position + srcRect.extent) / glm::vec2{ width, height };
+		const auto uv0 = (srcRect.position) / vec2{ width, height };
+		const auto uv1 = (srcRect.position + srcRect.extent) / vec2{ width, height };
 
 
 		spriteBatch.Begin();
-
-		/*	if (animationKey.flip == FrameFlip::horizontal)
-			{
-				spriteBatch.Draw(texture1, glm::vec2{ 0.0f, 0.0f });
-			}
-			else
-			{
-				spriteBatch.Draw(texture2, glm::vec2{ 0.0f, 0.0f }, Colors::Black);
-			}*/
-		/*spriteBatch.Draw(texture1, glm::vec2{ 0.1f, 0.0f });
-
-		spriteBatch.Draw(texture2, glm::vec2{ 0.2f, .2f }, Colors::Black);
-
-
-		spriteBatch.Draw(texture1, glm::vec2{ 0.3f, .3f });*/
-		spriteBatch.Draw(texture1, glm::vec2{ 0.0f, 0.0f });
-
+		spriteBatch.Draw(texture1, vec2{ 0.0f, 0.0f });
 		spriteBatch.End();
-
 
 		if (animationKey.flip == FrameFlip::horizontal)
 		{
-			ImGui::Image((ImTextureID)texture_handle, ImVec2{ srcRect.extent.x, srcRect.extent.y },
-						 ImVec2{ uv1.x, uv0.y }, ImVec2{ uv0.x, uv1.y });
+			ImGui::Image((ImTextureID)texture_handle, vec2{ srcRect.extent.x, srcRect.extent.y }, vec2{ uv1.x, uv0.y },
+						 vec2{ uv0.x, uv1.y });
 		}
 		else
 		{
 			ImGui::Image((ImTextureID)texture_handle, ImVec2{ srcRect.extent.x, srcRect.extent.y },
-						 ImVec2{ uv0.x, uv0.y }, ImVec2{ uv1.x, uv1.y });
+						 vec2{ uv0.x, uv0.y }, vec2{ uv1.x, uv1.y });
 		}
 
 
-		ImGui::Image((ImTextureID)texture_handle, ImVec2{ width / 8.0f, height / 8.0f });
+		ImGui::Image((ImTextureID)texture_handle, vec2{ width, height } / 8.0f);
 		ImGui::SameLine();
 
 		const auto& spriteFramebuffer = renderContext.Get(spriteBatchFramebuffer);
 		const auto& spriteColorTexture = renderContext.Get(spriteFramebuffer.colorAttachment[0]);
 		const auto& spriteDepthTexture = renderContext.Get(spriteFramebuffer.depthAttachment.value());
 
-		ImGui::Image((ImTextureID)spriteColorTexture.nativeHandle, ImVec2{ windowWidth / 4.0f, windowHeight / 4.0f });
+		ImGui::Image((ImTextureID)spriteColorTexture.nativeHandle, vec2{ windowWidth, windowHeight } / 4.0f);
 
 		ImGui::Render();
 
@@ -665,15 +448,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
 		glBindFramebuffer(GL_FRAMEBUFFER, spriteFramebuffer.nativeHandle);
 
-		auto result = glCheckNamedFramebufferStatus(spriteFramebuffer.nativeHandle, GL_FRAMEBUFFER);
-
+		// auto result = glCheckNamedFramebufferStatus(spriteFramebuffer.nativeHandle, GL_FRAMEBUFFER);
 
 		glBindProgramPipeline(fooPipeline);
 		glBindVertexArray(spriteBatch.vertexArrayObject);
 		// TODO:glBindTextureUnit, glBindSamplers, glBindBufferRange for uniforms
 		glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 6 * 3, 1, 0);
 		//---------------------------------------------
-
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
@@ -696,7 +477,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	ImGui_ImplSDL3_Shutdown();
 	ImGui::DestroyContext();
 
-
 	glDeleteProgramPipelines(1, &fooPipeline);
 	glDeleteBuffers(1, &vertexBuffer);
 	glDeleteProgram(fooVertProgram);
@@ -709,173 +489,4 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	SDL_Quit();
 
 	return 0;
-}
-
-void AnimationGraph::AddNode(const std::string& name, const AnimationIndex animationIndex)
-{
-	assert(not nameToNodeIndexMap.contains(name));
-	nameToNodeIndexMap[name] = animationIndex;
-}
-
-void AnimationGraph::AddTransition(const std::string& from, const std::string& to,
-								   const AnimationSyncBehavior& syncBehavior)
-{
-	const auto fromIndex = nameToNodeIndexMap[from];
-	const auto toIndex = nameToNodeIndexMap[to];
-	auto syncKey = i32{ 0 };
-	if (std::holds_alternative<SyncOnKey>(syncBehavior))
-	{
-		const auto sync = std::get<SyncOnKey>(syncBehavior);
-		syncKey = sync.key;
-	}
-	if (std::holds_alternative<SyncOnLastFrame>(syncBehavior))
-	{
-		const auto lastFrame = animations[fromIndex].animationFrameCount - 1;
-		syncKey = lastFrame;
-	}
-	if (std::holds_alternative<SyncImmediate>(syncBehavior))
-	{
-		syncKey = -1;
-	}
-	transitions[fromIndex].push_back(AnimationTransition{ syncKey, toIndex });
-}
-
-AnimationGraph::AnimationIndex AnimationGraph::GetNodeIndex(const std::string& nodeName) const
-{
-	assert(nameToNodeIndexMap.contains(nodeName));
-	return nameToNodeIndexMap.at(nodeName);
-}
-
-AnimationSequence AnimationGraph::FindAnimationSequence(const AnimationInstance& instance, const std::string& to)
-{
-	// TODO: The graph might be not fully connected, so it might fail in the while loop. As an possible strategy we can
-	// switch to a target animation immediatly.
-	const auto targetNodeIndex = nameToNodeIndexMap.at(to);
-	const auto startNodeIndex = instance.currentNodeIndex;
-	auto animationSequence = AnimationSequence{};
-
-	auto distances = std::vector<u32>{};
-	auto visited = std::vector<bool>{};
-	auto previes = std::vector<u32>{};
-	const auto nodes = nameToNodeIndexMap.size();
-	distances.resize(nodes);
-	visited.resize(nodes);
-	previes.resize(nodes);
-
-	constexpr auto maxDistanceValue = std::numeric_limits<decltype(distances)::value_type>::max();
-
-	auto searchMinimumDistance = [&]()
-	{
-		auto min = maxDistanceValue;
-		auto index = 0;
-
-		for (auto i = 0; i < nodes; i++)
-		{
-			if (not visited[i] and distances[i] <= min)
-			{
-				min = distances[i];
-				index = i;
-			}
-		}
-		return index;
-	};
-
-	for (auto i = 0; i < nodes; i++)
-	{
-		distances[i] = maxDistanceValue;
-		visited[i] = false;
-	}
-	distances[startNodeIndex] = 0;
-	for (auto i = 0; i < nodes; i++)
-	{
-		auto minimumDistanceIndex = searchMinimumDistance();
-		visited[minimumDistanceIndex] = true;
-
-		for (auto& transition : transitions[minimumDistanceIndex])
-		{
-			const auto foundShortestPath = not visited[transition.nodeIndex] and
-				distances[minimumDistanceIndex] != maxDistanceValue and
-				distances[minimumDistanceIndex] + 1 < distances[transition.nodeIndex];
-
-			if (foundShortestPath)
-			{
-				distances[transition.nodeIndex] = distances[minimumDistanceIndex] + 1;
-				previes[transition.nodeIndex] = minimumDistanceIndex;
-			}
-		}
-	}
-
-	animationSequence.push_back(SequenceItem{ targetNodeIndex, -1 });
-	auto tmp = targetNodeIndex;
-	while (tmp != startNodeIndex)
-	{
-		const auto previesNode = previes[tmp];
-		const auto& transition = transitions[previesNode];
-
-		auto animationTransitionKey = 0;
-		for (const auto& animation : transition)
-		{
-			if (animation.nodeIndex == tmp)
-			{
-				animationTransitionKey = animation.key;
-			}
-		}
-
-		animationSequence.push_back(SequenceItem{ previesNode, animationTransitionKey });
-		tmp = previesNode;
-	}
-
-	std::reverse(animationSequence.begin(), animationSequence.end());
-	return animationSequence;
-}
-
-AnimationInstance AnimationPlayer::ForwardAnimation(AnimationInstance instance, AnimationSequence& sequence)
-{
-	AnimationInstance newInstance;
-	newInstance.currentNodeIndex = instance.currentNodeIndex;
-	newInstance.key = instance.key;
-
-	if (nextKey)
-	{
-		const auto& animation = animations[instance.currentNodeIndex];
-
-
-		if (animation.repeat == AnimationRepeat::loop)
-		{
-			newInstance.key = (newInstance.key + 1) % animation.animationFrameCount;
-		}
-		else
-		{
-			newInstance.key = std::min((newInstance.key + 1), animation.animationFrameCount - 1);
-		}
-
-		if (not sequence.empty())
-		{
-			const auto& item = sequence.front();
-			if (item.node == newInstance.currentNodeIndex)
-			{
-				if (item.key == -1 or item.key == newInstance.key)
-				{
-					sequence.erase(std::remove(sequence.begin(), sequence.end(), item), sequence.end());
-					if (not sequence.empty())
-					{
-						newInstance.currentNodeIndex = sequence.front().node;
-						newInstance.key = 0;
-					}
-				}
-			}
-		}
-	}
-	return newInstance;
-}
-
-void AnimationPlayer::ForwardTime(const float deltaTime)
-{
-	nextKey = false;
-	localTime += deltaTime;
-	if (localTime > frameDuration)
-	{
-		nextKey = true;
-		localTime = fmodf(localTime, frameDuration);
-	}
 }

@@ -1,15 +1,15 @@
 #pragma once
 
-#include <glad/glad.h>
-#include <glm/vec2.hpp>
 #include <vector>
+
+#include "Common.hpp"
 
 struct Color
 {
-	uint8_t r;
-	uint8_t g;
-	uint8_t b;
-	uint8_t a;
+	u8 r;
+	u8 g;
+	u8 b;
+	u8 a;
 };
 namespace Colors
 {
@@ -29,13 +29,13 @@ struct SpriteBatch
 	void Begin();
 	void End();
 
-	void Draw(const SpriteTexture texture, const glm::vec2& postion, const Color& color = Colors::White);
+	void Draw(const SpriteTexture texture, const vec2& postion, const Color& color = Colors::White);
 
 public:
 	struct SpriteInfo
 	{
 		SpriteTexture texture;
-		glm::vec2 position;
+		vec2 position;
 		Color color;
 	};
 	std::vector<SpriteBatch::SpriteInfo> spriteInfos;
@@ -43,5 +43,5 @@ public:
 	// openGL specific fields
 	GLuint vertexBuffer;
 	GLuint vertexArrayObject;
-	const uint32_t defaultBufferSize = 16 * 1024 * 1024;
+	const u32 defaultBufferSize = 16 * 1024 * 1024;
 };

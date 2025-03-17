@@ -1,7 +1,5 @@
 #include "SpriteBatch.hpp"
 
-#include <glm/glm.hpp>
-
 /*
 
 ----------------------------------------------------------------------------
@@ -30,9 +28,9 @@ for(batch in batches)
 
 struct SpriteQuadVertex
 {
-	glm::vec2 position;
-	glm::vec2 uv;
-	glm::vec4 color;
+	vec2 position;
+	vec2 uv;
+	vec4 color;
 };
 
 SpriteBatch::SpriteBatch()
@@ -43,9 +41,9 @@ SpriteBatch::SpriteBatch()
 
 	glCreateVertexArrays(1, &vertexArrayObject);
 	//glObjectLabel(GL_VERTEX_ARRAY, vertexArrayObject, glLabel("sprite_batch_vao"));
-	const GLuint positionAttribute = 0;
-	const GLuint textureCoordinateAttribute = 1;
-	const GLuint colorAttribute = 2;
+	const auto positionAttribute = GLuint{0};
+	const auto textureCoordinateAttribute = GLuint{1};
+	const auto colorAttribute = GLuint{2};
 
 
 	glVertexArrayVertexBuffer(vertexArrayObject, 0, vertexBuffer, 0, sizeof(SpriteQuadVertex));
@@ -86,18 +84,18 @@ void SpriteBatch::End()
 		for (const auto& spriteInfo : spriteInfos)
 		{
 			const auto position = spriteInfo.position;
-			const auto extent = glm::vec2{ 1.0f, 1.0f };
+			const auto extent = vec2{ 1.0f, 1.0f };
 			const auto color =
-				glm::vec4{ spriteInfo.color.r, spriteInfo.color.g, spriteInfo.color.b, spriteInfo.color.a };
+				vec4{ spriteInfo.color.r, spriteInfo.color.g, spriteInfo.color.b, spriteInfo.color.a };
 
 			generatedVertices.push_back(SpriteQuadVertex{ position, { 0.0, 0.0 }, color });
-			generatedVertices.push_back(SpriteQuadVertex{ position + glm::vec2{ extent.x, 0 }, { 1.0, 0.0 }, color });
+			generatedVertices.push_back(SpriteQuadVertex{ position + vec2{ extent.x, 0 }, { 1.0, 0.0 }, color });
 			generatedVertices.push_back(
-				SpriteQuadVertex{ position + glm::vec2{ extent.x, extent.y }, { 1.0, 1.0 }, color });
+				SpriteQuadVertex{ position + vec2{ extent.x, extent.y }, { 1.0, 1.0 }, color });
 			generatedVertices.push_back(SpriteQuadVertex{ position, { 0.0, 0.0 }, color });
 			generatedVertices.push_back(
-				SpriteQuadVertex{ position + glm::vec2{ extent.x, extent.y }, { 1.0, 1.0 }, color });
-			generatedVertices.push_back(SpriteQuadVertex{ position + glm::vec2{ 0, extent.y }, { 0.0, 1.0 }, color });
+				SpriteQuadVertex{ position + vec2{ extent.x, extent.y }, { 1.0, 1.0 }, color });
+			generatedVertices.push_back(SpriteQuadVertex{ position + vec2{ 0, extent.y }, { 0.0, 1.0 }, color });
 		}
 
 		glNamedBufferSubData(vertexBuffer, 0, generatedVertices.size() * sizeof(SpriteQuadVertex),
@@ -107,7 +105,7 @@ void SpriteBatch::End()
 	spriteInfos.clear();
 }
 
-void SpriteBatch::Draw(const SpriteTexture texture, const glm::vec2& postion, const Color& color)
+void SpriteBatch::Draw(const SpriteTexture texture, const vec2& postion, const Color& color)
 {
 	spriteInfos.push_back(SpriteInfo{ .texture = texture, .position = postion, .color = color });
 }
