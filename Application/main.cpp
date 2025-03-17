@@ -52,8 +52,8 @@ enum class AnimationRepeat
 struct Animation
 {
 	std::string name;
-	uint32_t animationIndex;
-	uint32_t animationFrameCount;
+	u32 animationIndex;
+	u32 animationFrameCount;
 	AnimationRepeat repeat{ AnimationRepeat::once };
 };
 
@@ -65,8 +65,8 @@ enum class FrameFlip
 
 struct AnimationKey
 {
-	uint32_t frameIndex{ 0 };
-	uint32_t duration{ 1 };
+	u32 frameIndex{ 0 };
+	u32 duration{ 1 };
 	FrameFlip flip{ FrameFlip::none };
 };
 
@@ -113,7 +113,6 @@ static const auto animationSequences = std::array{
 	AnimationKey{ 9, 1, FrameFlip::horizontal },  AnimationKey{ 10, 1, FrameFlip::horizontal },
 	AnimationKey{ 11, 1, FrameFlip::horizontal }, AnimationKey{ 12, 1, FrameFlip::horizontal },
 	AnimationKey{ 13, 1, FrameFlip::horizontal }, AnimationKey{ 14, 1, FrameFlip::horizontal },
-
 };
 
 static const auto animations = std::array{
@@ -124,14 +123,14 @@ static const auto animations = std::array{
 
 struct AnimationInstance
 {
-	uint32_t currentNodeIndex;
-	uint32_t key;
+	u32 currentNodeIndex;
+	u32 key;
 };
 
 struct SequenceItem
 {
-	uint32_t node;
-	int key;
+	u32 node;
+	i32 key;
 
 	auto operator<=>(const SequenceItem&) const = default;
 };
@@ -152,16 +151,15 @@ struct AnimationState
 	std::string name;
 };
 
-
 struct AnimationTransition
 {
-	uint32_t key;
-	uint32_t nodeIndex;
+	i32 key;
+	u32 nodeIndex;
 };
 
 struct SyncOnKey
 {
-	uint32_t key;
+	i32 key;
 };
 
 struct SyncOnLastFrame
@@ -175,31 +173,25 @@ struct SyncImmediate
 namespace animation::sync
 {
 	inline constexpr SyncOnLastFrame lastFrame{};
-	inline constexpr SyncOnLastFrame immediate{};
+	inline constexpr SyncImmediate immediate{};
 
 } // namespace animation::sync
 
 using AnimationSyncBehavior = std::variant<SyncOnKey, SyncOnLastFrame, SyncImmediate>;
 
-
 struct AnimationGraph
 {
-	using AnimationIndex = uint32_t;
-
+	using AnimationIndex = u32;
 
 	void AddNode(const std::string& name, const AnimationIndex animationIndex);
 	void AddTransition(const std::string& from, const std::string& to,
 					   const AnimationSyncBehavior& syncBehavior = animation::sync::immediate);
-
 	AnimationIndex GetNodeIndex(const std::string& nodeName) const;
-
 	AnimationSequence FindAnimationSequence(const AnimationInstance& instance, const std::string& to);
-
 
 	std::unordered_map<std::string, AnimationIndex> nameToNodeIndexMap;
 	std::unordered_map<AnimationIndex, std::vector<AnimationTransition>> transitions;
 };
-
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
@@ -318,7 +310,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 		.debugName = "sprites_fb" });
 	//---------------------------------------------------------------
 
-	const auto vertexShaderCode = R"(#
+	const auto vertexShaderCode = R"(
 	#version 460
 
 	layout(location = 0) in vec2 Position;
@@ -438,7 +430,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	animationGraph.AddTransition("turn-left", "walk-left", animation::sync::lastFrame);
 
 	auto characterAnimationInstance =
-		AnimationInstance{ .currentNodeIndex = animationGraph.GetNodeIndex("walk-right"), .key = 0 };
+		AnimationInstance{ .currentNodeIndex = animationGraph.GetNodeIndex("idle-right"), .key = 0 };
 
 	auto characterAnimationSequence = AnimationSequence{};
 
@@ -539,10 +531,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
 			if (event.type == SDL_EVENT_WINDOW_RESIZED)
 			{
-				uint32_t newWidth;
-				uint32_t newHeight;
+				u32 newWidth;
+				u32 newHeight;
 				SDL_GetWindowSize(window, (int*)&newWidth, (int*)&newHeight);
-				renderContext.windowContext.UpdateSize(newWidth, newHeight);
+				windowWidth = newWidth;
+				windowHeight = newHeight;
+				renderContext.UpdateWindowSize(newWidth, newHeight);
 			}
 		}
 		if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)
@@ -623,12 +617,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 			{
 				spriteBatch.Draw(texture2, glm::vec2{ 0.0f, 0.0f }, Colors::Black);
 			}*/
-		spriteBatch.Draw(texture1, glm::vec2{ 0.1f, 0.0f });
+		/*spriteBatch.Draw(texture1, glm::vec2{ 0.1f, 0.0f });
 
 		spriteBatch.Draw(texture2, glm::vec2{ 0.2f, .2f }, Colors::Black);
 
 
-		spriteBatch.Draw(texture1, glm::vec2{ 0.3f, .3f });
+		spriteBatch.Draw(texture1, glm::vec2{ 0.3f, .3f });*/
+		spriteBatch.Draw(texture1, glm::vec2{ 0.0f, 0.0f });
 
 		spriteBatch.End();
 
@@ -648,9 +643,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 		ImGui::Image((ImTextureID)texture_handle, ImVec2{ width / 8.0f, height / 8.0f });
 		ImGui::SameLine();
 
-		const auto spriteFramebuffer = renderContext.Get(spriteBatchFramebuffer);
-		const auto spriteColorTexture = renderContext.Get(spriteFramebuffer.colorAttachment[0]);
-		const auto spriteDepthTexture = renderContext.Get(spriteFramebuffer.depthAttachment.value());
+		const auto& spriteFramebuffer = renderContext.Get(spriteBatchFramebuffer);
+		const auto& spriteColorTexture = renderContext.Get(spriteFramebuffer.colorAttachment[0]);
+		const auto& spriteDepthTexture = renderContext.Get(spriteFramebuffer.depthAttachment.value());
 
 		ImGui::Image((ImTextureID)spriteColorTexture.nativeHandle, ImVec2{ windowWidth / 4.0f, windowHeight / 4.0f });
 
@@ -727,7 +722,7 @@ void AnimationGraph::AddTransition(const std::string& from, const std::string& t
 {
 	const auto fromIndex = nameToNodeIndexMap[from];
 	const auto toIndex = nameToNodeIndexMap[to];
-	auto syncKey = uint32_t{ 0 };
+	auto syncKey = i32{ 0 };
 	if (std::holds_alternative<SyncOnKey>(syncBehavior))
 	{
 		const auto sync = std::get<SyncOnKey>(syncBehavior);
@@ -765,7 +760,6 @@ AnimationSequence AnimationGraph::FindAnimationSequence(const AnimationInstance&
 	return animationSequence;
 }
 
-
 AnimationInstance AnimationPlayer::ForwardAnimation(AnimationInstance instance, AnimationSequence& sequence)
 {
 	AnimationInstance newInstance;
@@ -788,7 +782,7 @@ AnimationInstance AnimationPlayer::ForwardAnimation(AnimationInstance instance, 
 
 		if (not sequence.empty())
 		{
-			const auto item = sequence.front();
+			const auto& item = sequence.front();
 			if (item.node == newInstance.currentNodeIndex)
 			{
 				if (item.key == -1 or item.key == newInstance.key)

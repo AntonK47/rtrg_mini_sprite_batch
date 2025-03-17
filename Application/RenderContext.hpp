@@ -8,43 +8,44 @@
 
 #include "Common.hpp"
 
-struct Texture2DHandle
+struct RenderContext;
+
+template <typename T>
+struct Handle
 {
+	friend RenderContext;
+	friend std::hash<Handle<T>>;
+
+	auto operator<=>(const Handle<T>&) const = default;
+
+private:
 	u32 key;
-	auto operator<=>(const Texture2DHandle&) const = default;
 };
 
-template <>
-struct std::hash<Texture2DHandle>
+template <typename T>
+struct std::hash<Handle<T>>
 {
-	std::size_t operator()(const Texture2DHandle& s) const noexcept
+	std::size_t operator()(const Handle<T>& s) const noexcept
 	{
-		return std::hash<int>()(s.key);
+		return std::hash<unsigned int>()(s.key);
 	}
 };
 
-struct FramebufferHandle
-{
-	u32 key;
-	auto operator<=>(const FramebufferHandle&) const = default;
-};
+struct Texture2D;
+struct Framebuffer;
+struct GraphicsPipeline;
 
-template <>
-struct std::hash<FramebufferHandle>
-{
-	std::size_t operator()(const FramebufferHandle& s) const noexcept
-	{
-		return std::hash<int>()(s.key);
-	}
-};
+using Texture2DHandle = Handle<Texture2D>;
+using FramebufferHandle = Handle<Framebuffer>;
+using GraphicsPipelineHandle = Handle<GraphicsPipeline>;
 
 
 enum class TextureFormat
 {
+	unknown,
 	rgba8,
 	d32f
 };
-
 
 struct StaticExtent
 {
@@ -70,18 +71,14 @@ struct Texture2DDescriptor
 struct Texture2D
 {
 	GLuint nativeHandle;
-
-	auto operator<=>(const Texture2D&) const = default;
 };
 
 struct Framebuffer
 {
-	GLuint nativeHandle;
-	std::array<Texture2DHandle, 1> colorAttachment;
-	std::optional<Texture2DHandle> depthAttachment;
+	GLuint nativeHandle{ 0 };
+	std::array<Texture2DHandle, 1> colorAttachment{};
+	std::optional<Texture2DHandle> depthAttachment{ std::nullopt };
 	bool isSizeDependent{ false };
-
-	auto operator<=>(const Framebuffer&) const = default;
 };
 
 struct FramebufferDescriptor
@@ -89,8 +86,6 @@ struct FramebufferDescriptor
 	std::array<Texture2DDescriptor, 1> colorAttachment;
 	std::optional<Texture2DDescriptor> depthAttachment;
 	const char* debugName = "";
-
-	auto operator<=>(const FramebufferDescriptor&) const = default;
 };
 
 
@@ -98,8 +93,6 @@ struct WindowSizeDependentFramebuffer
 {
 	Framebuffer framebuffer;
 	FramebufferDescriptor descriptor;
-
-	auto operator<=>(const WindowSizeDependentFramebuffer&) const = default;
 };
 
 struct ShaderCode
@@ -113,50 +106,26 @@ struct GraphicsPipelineDescriptor
 	ShaderCode vertexShaderCode;
 	ShaderCode fragmentSchaderCode;
 	const char* debugName = "";
-
-	auto operator<=>(const GraphicsPipelineDescriptor&) const = default;
 };
 
 struct GraphicsPipeline
 {
-	auto operator<=>(const GraphicsPipeline&) const = default;
 };
 
-struct GraphicsPipelineHandle
+
+struct WindowContext
 {
-	u32 key;
-
-	auto operator<=>(const GraphicsPipelineHandle&) const = default;
+	u32 width;
+	u32 height;
 };
-
-
-template <>
-struct std::hash<GraphicsPipelineHandle>
-{
-	std::size_t operator()(const GraphicsPipelineHandle& s) const noexcept
-	{
-		return std::hash<int>()(s.key);
-	}
-};
-
 
 struct RenderContext
 {
-	struct WindowContext
-	{
-		u32 width;
-		u32 height;
-		RenderContext* renderContext;
-
-		void UpdateSize(const u32 width, const u32 height);
-	};
-
-	WindowContext windowContext;
+	void UpdateWindowSize(const u32 width, const u32 height);
 
 	RenderContext(const u32 width, const u32 height);
 	virtual ~RenderContext();
 
-	void RecreateWindowSizeDependentResources();
 	Texture2DHandle CreateTexture2D(const Texture2DDescriptor& descriptor);
 	FramebufferHandle CreateFramebuffer(const FramebufferDescriptor& descriptor);
 
@@ -165,20 +134,23 @@ struct RenderContext
 
 	// TODO:
 	GraphicsPipelineHandle CreateGraphicsPipeline(const GraphicsPipelineDescriptor& descriptor);
+	void DestroyGraphicsPipeline(const GraphicsPipelineHandle graphicsPipeline);
 
 	Framebuffer& Get(FramebufferHandle handle);
 	Texture2D& Get(Texture2DHandle handle);
 	GraphicsPipeline& Get(GraphicsPipelineHandle handle);
 
 private:
+	void RecreateWindowSizeDependentResources();
+
 	Framebuffer CreateOpenGlFramebuffer(const FramebufferDescriptor& descriptor);
 	void DestroyOpenGlFramebuffer(const Framebuffer& framebuffer);
 
+	WindowContext windowContext;
+	// TODO: Maybe better resource managment, for example by using pools, resource invalidation, decoupled resouce
+	// managment class/struct
 	std::unordered_map<FramebufferHandle, Framebuffer> framebuffers;
-
 	std::unordered_map<FramebufferHandle, WindowSizeDependentFramebuffer> windowSizeDependentFramebuffers;
-
 	std::unordered_map<Texture2DHandle, Texture2D> textures;
-
 	std::unordered_map<GraphicsPipelineHandle, GraphicsPipeline> pipelines;
 };

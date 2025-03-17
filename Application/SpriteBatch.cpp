@@ -86,7 +86,7 @@ void SpriteBatch::End()
 		for (const auto& spriteInfo : spriteInfos)
 		{
 			const auto position = spriteInfo.position;
-			const auto extent = glm::vec2{ 0.1f, 0.1f };
+			const auto extent = glm::vec2{ 1.0f, 1.0f };
 			const auto color =
 				glm::vec4{ spriteInfo.color.r, spriteInfo.color.g, spriteInfo.color.b, spriteInfo.color.a };
 
@@ -103,6 +103,8 @@ void SpriteBatch::End()
 		glNamedBufferSubData(vertexBuffer, 0, generatedVertices.size() * sizeof(SpriteQuadVertex),
 							 generatedVertices.data());
 	}
+
+	spriteInfos.clear();
 }
 
 void SpriteBatch::Draw(const SpriteTexture texture, const glm::vec2& postion, const Color& color)

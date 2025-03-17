@@ -1,6 +1,6 @@
 ## TODO: 12.03.2025
 
-- [ ] create render_context
+- [x] create render_context
 	- [x] backbuffer context [width, height] - viewport - scissor
 	- [ ] helper for render to backbuffer (simple blit)
 	

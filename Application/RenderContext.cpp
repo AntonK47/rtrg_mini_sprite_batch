@@ -5,6 +5,7 @@ namespace
 {
 	GLenum mapToGlFormat(const TextureFormat& format)
 	{
+		assert(format != TextureFormat::unknown);
 		switch (format)
 		{
 		case TextureFormat::rgba8:
@@ -64,21 +65,22 @@ Framebuffer RenderContext::CreateOpenGlFramebuffer(const FramebufferDescriptor& 
 	return framebuffer;
 }
 
-void RenderContext::WindowContext::UpdateSize(const u32 width, const u32 height)
+
+void RenderContext::UpdateWindowSize(const u32 width, const u32 height)
 {
 	assert(width > 0 && height > 0);
-	auto sizeHasChanged = this->width != width || this->height != height;
+	auto sizeHasChanged = windowContext.width != width || windowContext.height != height;
 	if (sizeHasChanged)
 	{
-		this->height = height;
-		this->width = width;
-		renderContext->RecreateWindowSizeDependentResources();
+		windowContext.height = height;
+		windowContext.width = width;
+		RecreateWindowSizeDependentResources();
 	}
 }
 
 RenderContext::RenderContext(const u32 width, const u32 height)
 {
-	windowContext = { .width = width, .height = height, .renderContext = this };
+	windowContext = { .width = width, .height = height };
 }
 
 RenderContext::~RenderContext()
@@ -180,8 +182,13 @@ void RenderContext::DestroyFramebuffer(const FramebufferHandle framebuffer)
 
 GraphicsPipelineHandle RenderContext::CreateGraphicsPipeline(const GraphicsPipelineDescriptor& descriptor)
 {
-	//TODO
+	// TODO
 	return GraphicsPipelineHandle();
+}
+
+void RenderContext::DestroyGraphicsPipeline(const GraphicsPipelineHandle graphicsPipeline)
+{
+	// TODO
 }
 
 Framebuffer& RenderContext::Get(FramebufferHandle handle)
