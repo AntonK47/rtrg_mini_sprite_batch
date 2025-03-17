@@ -748,15 +748,84 @@ AnimationGraph::AnimationIndex AnimationGraph::GetNodeIndex(const std::string& n
 
 AnimationSequence AnimationGraph::FindAnimationSequence(const AnimationInstance& instance, const std::string& to)
 {
+	// TODO: The graph might be not fully connected, so it might fail in the while loop. As an possible strategy we can
+	// switch to a target animation immediatly.
 	const auto targetNodeIndex = nameToNodeIndexMap.at(to);
 	const auto startNodeIndex = instance.currentNodeIndex;
-
 	auto animationSequence = AnimationSequence{};
 
-	animationSequence.push_back(SequenceItem{ 4, -1 });
-	animationSequence.push_back(SequenceItem{ 2, 1 });
-	animationSequence.push_back(SequenceItem{ 5, -1 });
+	auto distances = std::vector<u32>{};
+	auto visited = std::vector<bool>{};
+	auto previes = std::vector<u32>{};
+	const auto nodes = nameToNodeIndexMap.size();
+	distances.resize(nodes);
+	visited.resize(nodes);
+	previes.resize(nodes);
 
+	constexpr auto maxDistanceValue = std::numeric_limits<decltype(distances)::value_type>::max();
+
+	auto searchMinimumDistance = [&]()
+	{
+		auto min = maxDistanceValue;
+		auto index = 0;
+
+		for (auto i = 0; i < nodes; i++)
+		{
+			if (not visited[i] and distances[i] <= min)
+			{
+				min = distances[i];
+				index = i;
+			}
+		}
+		return index;
+	};
+
+	for (auto i = 0; i < nodes; i++)
+	{
+		distances[i] = maxDistanceValue;
+		visited[i] = false;
+	}
+	distances[startNodeIndex] = 0;
+	for (auto i = 0; i < nodes; i++)
+	{
+		auto minimumDistanceIndex = searchMinimumDistance();
+		visited[minimumDistanceIndex] = true;
+
+		for (auto& transition : transitions[minimumDistanceIndex])
+		{
+			const auto foundShortestPath = not visited[transition.nodeIndex] and
+				distances[minimumDistanceIndex] != maxDistanceValue and
+				distances[minimumDistanceIndex] + 1 < distances[transition.nodeIndex];
+
+			if (foundShortestPath)
+			{
+				distances[transition.nodeIndex] = distances[minimumDistanceIndex] + 1;
+				previes[transition.nodeIndex] = minimumDistanceIndex;
+			}
+		}
+	}
+
+	animationSequence.push_back(SequenceItem{ targetNodeIndex, -1 });
+	auto tmp = targetNodeIndex;
+	while (tmp != startNodeIndex)
+	{
+		const auto previesNode = previes[tmp];
+		const auto& transition = transitions[previesNode];
+
+		auto animationTransitionKey = 0;
+		for (const auto& animation : transition)
+		{
+			if (animation.nodeIndex == tmp)
+			{
+				animationTransitionKey = animation.key;
+			}
+		}
+
+		animationSequence.push_back(SequenceItem{ previesNode, animationTransitionKey });
+		tmp = previesNode;
+	}
+
+	std::reverse(animationSequence.begin(), animationSequence.end());
 	return animationSequence;
 }
 
