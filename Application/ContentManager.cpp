@@ -13,6 +13,17 @@ struct ContentManager::ContentManagerImpl
 
 	Texture2DHandle LoadTexture(const std::filesystem::path& asset)
 	{
+		auto mapGliToTextureFormat =
+			[](gli::gl::format format)
+		{
+			if (format.Internal == gli::gl::INTERNAL_RGB_BP_UNORM)
+			{
+				return TextureFormat::bc_rgba_unorm;
+			}
+			assert(false);
+			return TextureFormat::unknown;
+		};
+
 		const auto textureData = gli::texture2d(gli::load(asset.generic_string()));
 		const auto gl = gli::gl(gli::gl::PROFILE_GL33);
 		const auto format = gl.translate(textureData.format(), textureData.swizzles());
@@ -22,7 +33,7 @@ struct ContentManager::ContentManagerImpl
 
 		auto textureHandle = renderContext.CreateTexture2D(
 			Texture2DDescriptor{ .extent = StaticExtent{ .width = (u32)width, .height = (u32)height },
-								 .format = TextureFormat::bc_rgba_unorm,
+								 .format = mapGliToTextureFormat(format),
 								 .levels = (u8)mips,
 								 .debugName = asset.generic_string().c_str() });
 
@@ -36,11 +47,8 @@ struct ContentManager::ContentManagerImpl
 	TextAsset LoadText(const std::filesystem::path& asset)
 	{
 		auto file = std::ifstream{ asset };
-
 		auto stream = std::ostringstream{};
-		;
 		stream << file.rdbuf();
-
 		return TextAsset{ stream.str() };
 	}
 
@@ -49,6 +57,7 @@ struct ContentManager::ContentManagerImpl
 
 
 ContentManager::ContentManager(RenderContext* renderContext, const std::string_view assetRootPath)
+	: assetRootPath{ assetRootPath }
 {
 	impl = std::make_unique<ContentManager::ContentManagerImpl>(*renderContext);
 }

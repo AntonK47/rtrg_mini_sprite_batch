@@ -1,13 +1,14 @@
 #include "SampleGame.hpp"
-#include "ImGui.hpp"
-
 #include <regex>
+#include "ContentManager.hpp"
+#include "ImGui.hpp"
+#include "RenderContext.hpp"
 
 SampleGame::SampleGame()
 {
 }
 
-void SampleGame::OnDraw(const f32 time)
+void SampleGame::OnDraw(const f32 deltaTime)
 {
 	static auto showDemoWindow = true;
 	if (showDemoWindow)
@@ -30,7 +31,8 @@ void SampleGame::OnDraw(const f32 time)
 		if (std::regex_match(animations[characterAnimationInstance.currentNodeIndex].name,
 							 std::regex{ "[a-z]+\\-right" }))
 		{
-			characterAnimationSequence = animationGraph->FindAnimationSequence(characterAnimationInstance, "idle-right");
+			characterAnimationSequence =
+				animationGraph->FindAnimationSequence(characterAnimationInstance, "idle-right");
 		}
 		if (std::regex_match(animations[characterAnimationInstance.currentNodeIndex].name,
 							 std::regex{ "[a-z]+\\-left" }))
@@ -44,31 +46,35 @@ void SampleGame::OnDraw(const f32 time)
 	const auto& animationKey = animationSequences[animation.animationIndex + characterAnimationInstance.key];
 	const auto& frame = animationFrames[animationKey.frameIndex];
 
+	const auto& huskSpriteTexture = renderContext->Get(huskTexture);
+
 	const auto srcRect = frame.sourceSprite;
-	const auto width = 10;
-	const auto height = 10;
-	const auto uv0 = (srcRect.position) / vec2{ width, height };
-	const auto uv1 = (srcRect.position + srcRect.extent) / vec2{ width, height };
+	const auto uv0 = (srcRect.position) / vec2{ huskSpriteTexture.width, huskSpriteTexture.height };
+	const auto uv1 = (srcRect.position + srcRect.extent) / vec2{ huskSpriteTexture.width, huskSpriteTexture.height };
+
+
+	if (animationKey.flip == FrameFlip::horizontal)
+	{
+		ImGui::Image((ImTextureID)huskSpriteTexture.nativeHandle, vec2{ srcRect.extent.x, srcRect.extent.y },
+					 vec2{ uv1.x, uv0.y }, vec2{ uv0.x, uv1.y });
+	}
+	else
+	{
+		ImGui::Image((ImTextureID)huskSpriteTexture.nativeHandle, ImVec2{ srcRect.extent.x, srcRect.extent.y },
+					 vec2{ uv0.x, uv0.y }, vec2{ uv1.x, uv1.y });
+	}
+
+
+	ImGui::Image((ImTextureID)huskSpriteTexture.nativeHandle,
+				 vec2{ huskSpriteTexture.width, huskSpriteTexture.height } / 8.0f);
+	ImGui::SameLine();
 
 
 	/*spriteBatch.Begin();
 	spriteBatch.Draw(texture1, vec2{ 0.0f, 0.0f });
 	spriteBatch.End();
 
-	if (animationKey.flip == FrameFlip::horizontal)
-	{
-		ImGui::Image((ImTextureID)texture_handle, vec2{ srcRect.extent.x, srcRect.extent.y }, vec2{ uv1.x, uv0.y },
-					 vec2{ uv0.x, uv1.y });
-	}
-	else
-	{
-		ImGui::Image((ImTextureID)texture_handle, ImVec2{ srcRect.extent.x, srcRect.extent.y }, vec2{ uv0.x, uv0.y },
-					 vec2{ uv1.x, uv1.y });
-	}
-
-
-	ImGui::Image((ImTextureID)texture_handle, vec2{ width, height } / 8.0f);
-	ImGui::SameLine();
+	
 
 	const auto& spriteFramebuffer = game.renderContext->Get(spriteBatchFramebuffer);
 	const auto& spriteColorTexture = game.renderContext->Get(spriteFramebuffer.colorAttachment[0]);
@@ -80,7 +86,8 @@ void SampleGame::OnDraw(const f32 time)
 void SampleGame::OnUpdate(const f32 deltaTime)
 {
 	animationPlayer->ForwardTime(deltaTime);
-	characterAnimationInstance = animationPlayer->ForwardAnimation(characterAnimationInstance, characterAnimationSequence);
+	characterAnimationInstance =
+		animationPlayer->ForwardAnimation(characterAnimationInstance, characterAnimationSequence);
 }
 
 void SampleGame::OnLoad()
@@ -88,9 +95,8 @@ void SampleGame::OnLoad()
 	spriteBatch = std::make_unique<SpriteBatch>(renderContext.get());
 	animationPlayer = std::make_unique<AnimationPlayer>();
 	animationGraph = std::make_unique<AnimationGraph>();
-	content = std::make_unique<ContentManager>(renderContext.get());
 
-	huskTexture = content->LoadTexture("Assets/great_husk_sentry.DDS");
+	huskTexture = content->LoadTexture("Textures/great_husk_sentry.DDS");
 
 	for (auto i = 0; i < animations.size(); i++)
 	{
@@ -117,4 +123,5 @@ void SampleGame::OnLoad()
 
 void SampleGame::OnUnload()
 {
+	renderContext->DestroyTexture2D(huskTexture);
 }

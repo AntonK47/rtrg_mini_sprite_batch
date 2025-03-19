@@ -12,7 +12,7 @@ using TextAsset = std::string;
 struct ContentManager
 {
 public:
-	ContentManager(RenderContext* renderContext, const std::string_view assetRootPath = "Assets");
+	ContentManager(RenderContext* renderContext, const std::string_view assetRootPath);
 	virtual ~ContentManager();
 
 	Texture2DHandle LoadTexture(const std::string_view asset);

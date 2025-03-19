@@ -16,7 +16,6 @@ PRIVATE
 	imgui::imgui
 	glm::glm-header-only
 	glad::glad
-	tiny_dds::tiny_dds
 	gli
 )
 

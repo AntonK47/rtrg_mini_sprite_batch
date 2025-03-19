@@ -2,7 +2,7 @@
 
 int main(int argc, char* argv[])
 {
-	SampleGame game{};
+	auto game = SampleGame{};
 	game.Run(argc, argv);
 
 	return 0;
