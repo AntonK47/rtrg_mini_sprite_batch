@@ -21,9 +21,11 @@ struct SpriteTexture
 {
 };
 
+struct RenderContext;
+
 struct SpriteBatch
 {
-	SpriteBatch();
+	SpriteBatch(RenderContext* context);
 	virtual ~SpriteBatch();
 
 	void Begin();

@@ -31,14 +31,14 @@
 	- [ ] embed screen coordinate to NDC matrix :rocket: :rocket: :rocket:
 		- [ ] test it with mouse position tracing :rocket: :rocket: :rocket:
 - [ ] extend begin interface:
-	- [ ] add transform matrix
+	- [ ] add transform matrix :rocket: :rocket:
 - [ ] extend draw interface :rocket:
 	- [ ] rotation -> origin
 	- [ ] scale
 	- [ ] layer
 	- [ ] texture sampling :rocket: :rocket:
 	- [ ] flip -> horizontal, vertical, both
-	- [ ] add blending state :rocket:
+	- [ ] add sprites blending state :rocket:
 	
 	#### offline tasks (not related to sprite_batch)
 	- [ ] checkout tiled 2d integration

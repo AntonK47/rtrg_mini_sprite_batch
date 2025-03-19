@@ -1,6 +1,8 @@
 #include "RenderContext.hpp"
 #include <assert.h>
 
+#include <glm/glm.hpp>
+
 namespace
 {
 	GLenum mapToGlFormat(const TextureFormat& format)
@@ -12,6 +14,8 @@ namespace
 			return GL_RGBA8;
 		case TextureFormat::d32f:
 			return GL_DEPTH_COMPONENT32F;
+		case TextureFormat::bc_rgba_unorm:
+			return GL_COMPRESSED_RGBA_BPTC_UNORM;
 		}
 		return 0;
 	}
@@ -119,9 +123,14 @@ Texture2DHandle RenderContext::CreateTexture2D(const Texture2DDescriptor& descri
 	glCreateTextures(GL_TEXTURE_2D, 1, &texture.nativeHandle);
 	glTextureParameteri(texture.nativeHandle, GL_TEXTURE_BASE_LEVEL, 0);
 	glTextureParameteri(texture.nativeHandle, GL_TEXTURE_MAX_LEVEL, 0);
-	glTextureStorage2D(texture.nativeHandle, 1, mapToGlFormat(descriptor.format), static_cast<GLsizei>(width),
-					   static_cast<GLsizei>(height));
+	glTextureStorage2D(texture.nativeHandle, descriptor.levels, mapToGlFormat(descriptor.format),
+					   static_cast<GLsizei>(width), static_cast<GLsizei>(height));
 	glObjectLabel(GL_TEXTURE, texture.nativeHandle, glLabel(descriptor.debugName));
+
+	texture.width = width;
+	texture.height = height;
+	texture.levels = descriptor.levels;
+	texture.format = descriptor.format;
 
 	auto texture2DHandle = Texture2DHandle{};
 	texture2DHandle.key = GenerateKey();
@@ -179,15 +188,68 @@ void RenderContext::DestroyFramebuffer(const FramebufferHandle framebuffer)
 										framebuffers.erase(framebuffer);
 }
 
+void RenderContext::UploadTextureData(const Texture2DHandle texture, const u8 level, void* data, size_t size)
+{
+	auto& nativeTexture = Get(texture);
+	auto extent = glm::uvec2{ nativeTexture.width, nativeTexture.height };
+	auto mipExtent = glm::uvec2(extent >> glm::uvec2{ static_cast<u32>(level) });
+	mipExtent = glm::max(mipExtent, glm::uvec2(static_cast<u32>(1u)));
+
+	glCompressedTextureSubImage2D(nativeTexture.nativeHandle, static_cast<GLint>(level), 0, 0,
+								  static_cast<GLsizei>(mipExtent.x), static_cast<GLsizei>(mipExtent.y),
+								  mapToGlFormat(nativeTexture.format), static_cast<GLsizei>(size), data);
+}
+
 GraphicsPipelineHandle RenderContext::CreateGraphicsPipeline(const GraphicsPipelineDescriptor& descriptor)
 {
-	// TODO
-	return GraphicsPipelineHandle();
+	const auto sourcesVertexShader = std::array{ descriptor.vertexShaderCode.code.c_str() };
+	const auto sourcesFragmentShader = std::array{ descriptor.fragmentShaderCode.code.c_str() };
+
+	const auto vertexProgram = glCreateShaderProgramv(GL_VERTEX_SHADER, 1, sourcesVertexShader.data());
+	glObjectLabel(GL_PROGRAM, vertexProgram, glLabel(descriptor.vertexShaderCode.debugName));
+	const auto fragmentProgram = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, sourcesFragmentShader.data());
+	glObjectLabel(GL_PROGRAM, fragmentProgram, glLabel(descriptor.fragmentShaderCode.debugName));
+
+	auto pipeline = GraphicsPipeline{};
+
+	glCreateProgramPipelines(1, &pipeline.nativeHandle);
+
+	glObjectLabel(GL_PROGRAM_PIPELINE, pipeline.nativeHandle, glLabel(descriptor.debugName));
+	glUseProgramStages(pipeline.nativeHandle, GL_VERTEX_SHADER_BIT, vertexProgram);
+	glUseProgramStages(pipeline.nativeHandle, GL_FRAGMENT_SHADER_BIT, fragmentProgram);
+
+	glDeleteProgram(vertexProgram);
+	glDeleteProgram(fragmentProgram);
+#if 0
+		auto validateProgram = [](GLuint program)
+			{
+				int success;
+				glGetProgramiv(program, GL_LINK_STATUS, &success);
+				if (!success)
+				{
+					char infoLog[512];
+					glGetProgramInfoLog(program, 512, NULL, infoLog);
+					std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+				}
+			};
+
+		validateProgram(fooVertProgram1);
+		validateProgram(fooFragProgram1);
+#endif
+
+	auto pipelineHandle = GraphicsPipelineHandle{};
+	pipelineHandle.key = GenerateKey();
+	pipelines[pipelineHandle] = pipeline;
+	return pipelineHandle;
 }
 
 void RenderContext::DestroyGraphicsPipeline(const GraphicsPipelineHandle graphicsPipeline)
 {
-	// TODO
+	const auto& pipeline = Get(graphicsPipeline);
+
+	glDeleteProgramPipelines(1, &pipeline.nativeHandle);
+
+	pipelines.erase(graphicsPipeline);
 }
 
 Framebuffer& RenderContext::Get(FramebufferHandle handle)

@@ -1,123 +1,14 @@
 #pragma once
 #include <array>
-
 #include <optional>
 #include <unordered_map>
 #include <variant>
 #include <vector>
 
 #include "Common.hpp"
-
-struct RenderContext;
-
-template <typename T>
-struct Handle
-{
-	friend RenderContext;
-	friend std::hash<Handle<T>>;
-
-	auto operator<=>(const Handle<T>&) const = default;
-
-private:
-	u32 key;
-};
-
-template <typename T>
-struct std::hash<Handle<T>>
-{
-	std::size_t operator()(const Handle<T>& s) const noexcept
-	{
-		return std::hash<unsigned int>()(s.key);
-	}
-};
-
-struct Texture2D;
-struct Framebuffer;
-struct GraphicsPipeline;
-
-using Texture2DHandle = Handle<Texture2D>;
-using FramebufferHandle = Handle<Framebuffer>;
-using GraphicsPipelineHandle = Handle<GraphicsPipeline>;
+#include "RenderResources.hpp"
 
 
-enum class TextureFormat
-{
-	unknown,
-	rgba8,
-	d32f
-};
-
-struct StaticExtent
-{
-	u32 width;
-	u32 height;
-};
-
-struct DynamicExtent
-{
-	f32 scaleWidth{ 1.0f };
-	f32 scaleHeight{ 1.0f };
-};
-
-using Extent = std::variant<StaticExtent, DynamicExtent>;
-
-struct Texture2DDescriptor
-{
-	Extent extent;
-	TextureFormat format;
-	const char* debugName = "";
-};
-
-struct Texture2D
-{
-	GLuint nativeHandle;
-};
-
-struct Framebuffer
-{
-	GLuint nativeHandle{ 0 };
-	std::array<Texture2DHandle, 1> colorAttachment{};
-	std::optional<Texture2DHandle> depthAttachment{ std::nullopt };
-	bool isSizeDependent{ false };
-};
-
-struct FramebufferDescriptor
-{
-	std::array<Texture2DDescriptor, 1> colorAttachment;
-	std::optional<Texture2DDescriptor> depthAttachment;
-	const char* debugName = "";
-};
-
-
-struct WindowSizeDependentFramebuffer
-{
-	Framebuffer framebuffer;
-	FramebufferDescriptor descriptor;
-};
-
-struct ShaderCode
-{
-	const char* code;
-	const char* debugName = "";
-};
-
-struct GraphicsPipelineDescriptor
-{
-	ShaderCode vertexShaderCode;
-	ShaderCode fragmentSchaderCode;
-	const char* debugName = "";
-};
-
-struct GraphicsPipeline
-{
-};
-
-
-struct WindowContext
-{
-	u32 width;
-	u32 height;
-};
 
 struct RenderContext
 {
@@ -131,6 +22,8 @@ struct RenderContext
 
 	void DestroyTexture2D(const Texture2DHandle texture);
 	void DestroyFramebuffer(const FramebufferHandle framebuffer);
+
+	void UploadTextureData(const Texture2DHandle texture, const u8 level, void* data, size_t size);
 
 	// TODO:
 	GraphicsPipelineHandle CreateGraphicsPipeline(const GraphicsPipelineDescriptor& descriptor);

@@ -33,7 +33,7 @@ struct SpriteQuadVertex
 	vec4 color;
 };
 
-SpriteBatch::SpriteBatch()
+SpriteBatch::SpriteBatch(RenderContext* context)
 {
 	glCreateBuffers(1, &vertexBuffer);
 	glObjectLabel(GL_BUFFER, vertexBuffer, glLabel("sprite_batch_buffer"));
