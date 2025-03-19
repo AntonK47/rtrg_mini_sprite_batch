@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Common.hpp"
-
 #define IMGUI_USER_CONFIG "ImGuiConfig.hpp"
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>

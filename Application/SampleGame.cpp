@@ -1,5 +1,7 @@
 #include "SampleGame.hpp"
+#include <box2d/box2d.h>
 #include <regex>
+
 #include "ContentManager.hpp"
 #include "ImGui.hpp"
 #include "RenderContext.hpp"
@@ -74,7 +76,7 @@ void SampleGame::OnDraw(const f32 deltaTime)
 	spriteBatch.Draw(texture1, vec2{ 0.0f, 0.0f });
 	spriteBatch.End();
 
-	
+
 
 	const auto& spriteFramebuffer = game.renderContext->Get(spriteBatchFramebuffer);
 	const auto& spriteColorTexture = game.renderContext->Get(spriteFramebuffer.colorAttachment[0]);
@@ -119,6 +121,41 @@ void SampleGame::OnLoad()
 
 	characterAnimationInstance =
 		AnimationInstance{ .currentNodeIndex = animationGraph->GetNodeIndex("idle-right"), .key = 0 };
+
+
+	auto debugDraw = b2DefaultDebugDraw();
+
+	debugDraw.DrawSegment = [](b2Vec2 p1, b2Vec2 p2, b2HexColor color, void* context)
+	{
+		auto& spriteBatch = *((SpriteBatch*)context);
+		spriteBatch.Draw(SpriteTexture{}, vec2(p1.x, p1.y));
+	};
+	debugDraw.DrawPolygon = [](const b2Vec2* vertices, int vertexCount, b2HexColor color, void* context)
+	{
+		auto& spriteBatch = *((SpriteBatch*)context);
+		for (auto i = 0; i < vertexCount - 1; i++)
+		{
+			auto& v0 = vertices[i];
+			auto& v1 = vertices[i + 1];
+			spriteBatch.Draw(SpriteTexture{}, vec2(v0.x, v0.y));
+			spriteBatch.Draw(SpriteTexture{}, vec2(v1.x, v1.y));
+		}
+	};
+	debugDraw.drawAABBs = true;
+	auto worldDefinition = b2DefaultWorldDef();
+
+	worldDefinition.gravity = ToBox2Vector(vec2{ 0.0f, -10.0f });
+	const auto worldId = b2CreateWorld(&worldDefinition);
+
+	auto bodyDefinition = b2DefaultBodyDef();
+	bodyDefinition.position = ToBox2Vector(vec2{ 0.0f, 0.0f });
+	auto bodyId = b2CreateBody(worldId, &bodyDefinition);
+
+	auto box = b2MakeBox(50.0f, 10.0f);
+	const auto shapeDefinition = b2DefaultShapeDef();
+	b2CreatePolygonShape(bodyId, &shapeDefinition, &box);
+	debugDraw.context = &spriteBatch;
+	//b2World_Draw(worldId, &debugDraw);
 }
 
 void SampleGame::OnUnload()

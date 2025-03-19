@@ -71,3 +71,13 @@ INTERFACE
     tinydds/
 )
 set_target_properties(tiny_dds PROPERTIES FOLDER "thirdParty/tiny_dds")
+
+
+FetchContent_Declare(
+  box2d
+  GIT_REPOSITORY https://github.com/erincatto/box2d.git
+  GIT_TAG        main
+)
+
+FetchContent_MakeAvailable(box2d)
+set_target_properties(box2d PROPERTIES FOLDER "thirdParty/box2d")

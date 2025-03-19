@@ -17,6 +17,7 @@ PRIVATE
 	glm::glm-header-only
 	glad::glad
 	gli
+	box2d::box2d
 )
 
 if(WIN32)

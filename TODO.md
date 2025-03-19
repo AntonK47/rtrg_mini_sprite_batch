@@ -1,5 +1,3 @@
-
-
 # TODO
 > The rocket ( :rocket: ) emoji is used to mark priority. More rockets ( :rocket: ) means higher priority. 
 
@@ -50,3 +48,6 @@
 	- [ ] camera controller -> smooth transitions, smooth zoom in/out
 	- [ ] twinning library (create a custom one or take some existing one)
 	- [ ] design a simple "stupid" ai behavior
+	- [ ] create abstract Game class
+	- [ ] split framework and game/application
+	- [ ] move animation data to game/application code
