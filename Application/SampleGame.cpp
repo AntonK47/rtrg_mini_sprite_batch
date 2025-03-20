@@ -6,6 +6,9 @@
 #include "ImGui.hpp"
 #include "RenderContext.hpp"
 
+b2DebugDraw debugDraw;
+b2WorldId worldId;
+
 SampleGame::SampleGame()
 {
 }
@@ -71,6 +74,7 @@ void SampleGame::OnDraw(const f32 deltaTime)
 				 vec2{ huskSpriteTexture.width, huskSpriteTexture.height } / 8.0f);
 	ImGui::SameLine();
 
+	b2World_Draw(worldId, &debugDraw);
 
 	/*spriteBatch.Begin();
 	spriteBatch.Draw(texture1, vec2{ 0.0f, 0.0f });
@@ -90,6 +94,9 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 	animationPlayer->ForwardTime(deltaTime);
 	characterAnimationInstance =
 		animationPlayer->ForwardAnimation(characterAnimationInstance, characterAnimationSequence);
+
+
+	b2World_Step(worldId, deltaTime, 4);
 }
 
 void SampleGame::OnLoad()
@@ -123,7 +130,7 @@ void SampleGame::OnLoad()
 		AnimationInstance{ .currentNodeIndex = animationGraph->GetNodeIndex("idle-right"), .key = 0 };
 
 
-	auto debugDraw = b2DefaultDebugDraw();
+	debugDraw = b2DefaultDebugDraw();
 
 	debugDraw.DrawSegment = [](b2Vec2 p1, b2Vec2 p2, b2HexColor color, void* context)
 	{
@@ -132,30 +139,58 @@ void SampleGame::OnLoad()
 	};
 	debugDraw.DrawPolygon = [](const b2Vec2* vertices, int vertexCount, b2HexColor color, void* context)
 	{
-		auto& spriteBatch = *((SpriteBatch*)context);
-		for (auto i = 0; i < vertexCount - 1; i++)
+		auto& drawList = *ImGui::GetBackgroundDrawList();
+		// auto& spriteBatch = *((SpriteBatch*)context);
+		for (auto i = 0; i < vertexCount; i++)
 		{
 			auto& v0 = vertices[i];
-			auto& v1 = vertices[i + 1];
-			spriteBatch.Draw(SpriteTexture{}, vec2(v0.x, v0.y));
-			spriteBatch.Draw(SpriteTexture{}, vec2(v1.x, v1.y));
+			auto& v1 = vertices[(i + 1)%vertexCount];
+
+			drawList.AddLine(vec2(v0.x, v0.y), vec2(v1.x, v1.y), ImColor{0.0f,0.0f,0.0f,1.0f} + color, 3.0f);
+
+			/*spriteBatch.Draw(SpriteTexture{}, vec2(v0.x, v0.y));
+			spriteBatch.Draw(SpriteTexture{}, vec2(v1.x, v1.y));*/
 		}
 	};
+	debugDraw.DrawString = [](b2Vec2 p, const char* s, b2HexColor color, void* context)
+	{
+		auto& drawList = *ImGui::GetBackgroundDrawList();
+		ImGui::GetIO().FontGlobalScale = 2.0f;
+		drawList.AddText(vec2(p.x, p.y), ImColor{0.0f,0.0f,0.0f,1.0f} + color, s);
+	};
 	debugDraw.drawAABBs = true;
+	//debugDraw.drawBodyNames = true;
 	auto worldDefinition = b2DefaultWorldDef();
+	worldDefinition.gravity = ToBox2Vector(vec2{ 0.0f, 10.0f });
+	worldId = b2CreateWorld(&worldDefinition);
 
-	worldDefinition.gravity = ToBox2Vector(vec2{ 0.0f, -10.0f });
-	const auto worldId = b2CreateWorld(&worldDefinition);
+	{
+		auto bodyDefinition = b2DefaultBodyDef();
+		bodyDefinition.position = ToBox2Vector(vec2{ 400.0f, 500.0f });
+		bodyDefinition.name = "floor";
+		auto bodyId = b2CreateBody(worldId, &bodyDefinition);
 
-	auto bodyDefinition = b2DefaultBodyDef();
-	bodyDefinition.position = ToBox2Vector(vec2{ 0.0f, 0.0f });
-	auto bodyId = b2CreateBody(worldId, &bodyDefinition);
+		auto box = b2MakeBox(150.0f, 10.0f);
+		const auto shapeDefinition = b2DefaultShapeDef();
+		b2CreatePolygonShape(bodyId, &shapeDefinition, &box);
+	}
+	{
+		b2BodyDef bodyDef = b2DefaultBodyDef();
+		bodyDef.type = b2_dynamicBody;
+		bodyDef.position = ToBox2Vector(vec2{ 400.0f, 100.0f });
+		bodyDef.rotation = b2MakeRot(0.25f * B2_PI);
+		bodyDef.name = "dynamic_element";
+		bodyDef.linearDamping = 0.0f;
+		bodyDef.angularDamping = 0.1f;
 
-	auto box = b2MakeBox(50.0f, 10.0f);
-	const auto shapeDefinition = b2DefaultShapeDef();
-	b2CreatePolygonShape(bodyId, &shapeDefinition, &box);
-	debugDraw.context = &spriteBatch;
-	//b2World_Draw(worldId, &debugDraw);
+		b2BodyId bodyId = b2CreateBody(worldId, &bodyDef);
+		b2Polygon dynamicBox = b2MakeBox(100.0f, 100.0f);
+		b2ShapeDef shapeDef = b2DefaultShapeDef();
+		shapeDef.density = 0.4f;
+		shapeDef.friction = 0.3f;
+		
+		b2CreatePolygonShape(bodyId, &shapeDef, &dynamicBox);
+	}
 }
 
 void SampleGame::OnUnload()
