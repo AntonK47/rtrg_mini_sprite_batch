@@ -13,10 +13,29 @@ using vec4 = glm::vec4;
 
 using f32 = float;
 
+template <typename T1, typename T2>
+inline T1 CastTo(const T2& value)
+{
+	return T1{};
+}
+
+template<>
+inline b2Vec2 CastTo(const vec2& value)
+{
+	return b2Vec2{ value.x, value.y };
+}
+
+template<>
+inline vec2 CastTo(const b2Vec2& value)
+{
+	return vec2{ value.x, value.y };
+}
+
 inline b2Vec2 ToBox2Vector(const vec2& f)
 {
 	return b2Vec2{ f.x, f.y };
 }
+
 
 struct Rectangle
 {

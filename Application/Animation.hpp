@@ -113,7 +113,7 @@ struct AnimationPlayer
 	void ForwardTime(const f32 deltaTime);
 
 	f32 localTime;
-	f32 frameDuration{ 0.016f };
+	f32 frameDuration{ 0.16f };
 	bool nextKey{ false };
 };
 

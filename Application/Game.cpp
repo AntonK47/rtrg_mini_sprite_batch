@@ -30,7 +30,7 @@ public:
 	void Run(Game& game, int argc, char* argv[])
 	{
 		// Setup SDL
-		if (!SDL_Init(SDL_INIT_VIDEO))
+		if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
 		{
 			std::println("Error: SDL_Init(): {}\n", SDL_GetError());
 			return;
@@ -88,7 +88,8 @@ public:
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
 		(void)io;
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
+		io.BackendFlags = ImGuiBackendFlags_HasGamepad;
 
 
 		ImGui::StyleColorsDark();
