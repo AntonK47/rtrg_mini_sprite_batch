@@ -5,7 +5,7 @@
 ---
 - [x] create render_context
 	- [x] backbuffer context [width, height] - viewport - scissor
-	- [ ] helper for render to backbuffer (simple blit) :rocket: :rocket: 
+	- [x] helper for render to backbuffer (simple blit) :rocket: :rocket: 
 	> The heavy lifting part of this task is already done, but we have to move the rest of a code related to blit out of main into the render_context itself, or create a new helper class/struct.
 	- [ ] store pipelines/samplers :rocket:
 	> The pipeline and the samplers objects should be stored in the render_context. Follow the api of storing FBO's. The user should only work with handle object.
@@ -23,31 +23,31 @@
 	- [x] TextureDescriptor
 	---
 	
-- [ ] pass render_context to sprite_batch :rocket: :rocket:
+- [x] pass render_context to sprite_batch :rocket: :rocket:
 - [ ] in sprite_batch: :rocket:
 	- [x] render color attachment from FBO to backbuffer
-	- [ ] embed screen coordinate to NDC matrix :rocket: :rocket: :rocket:
-		- [ ] test it with mouse position tracing :rocket: :rocket: :rocket:
+	- [x] embed screen coordinate to NDC matrix
+		- [x] test it with mouse position tracing
 - [ ] extend begin interface:
 	- [ ] add transform matrix :rocket: :rocket:
 - [ ] extend draw interface :rocket:
 	- [ ] rotation -> origin
 	- [ ] scale
 	- [ ] layer
-	- [ ] texture sampling :rocket: :rocket:
-	- [ ] flip -> horizontal, vertical, both
+	- [x] texture sampling :rocket: :rocket:
+	- [x] flip -> horizontal, vertical, both
 	- [ ] add sprites blending state :rocket:
 	
 	#### offline tasks (not related to sprite_batch)
 	- [ ] checkout tiled 2d integration
 	- [ ] checkout the box2d for physics and collision detection
-	- [ ] add debug visualization for box2d (using sprite_batch or imgui's draw list api)
-	- [ ] implement basic character controller 
-	- [ ] add controller/keyboard controls
+	- [x] add debug visualization for box2d (using sprite_batch or imgui's draw list api)
+	- [x] implement basic character controller 
+	- [x] add controller/keyboard controls
 	- [ ] add jump, attack animation and insert them into animation graph
 	- [ ] camera controller -> smooth transitions, smooth zoom in/out
 	- [ ] twinning library (create a custom one or take some existing one)
 	- [ ] design a simple "stupid" ai behavior
-	- [ ] create abstract Game class
+	- [x] create abstract Game class
 	- [ ] split framework and game/application
 	- [ ] move animation data to game/application code

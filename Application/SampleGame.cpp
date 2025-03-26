@@ -223,7 +223,7 @@ void SampleGame::OnLoad()
 
 
 		auto shapeDefinition = b2DefaultShapeDef();
-		//TODO: set more intuitive values
+		// TODO: set more intuitive values
 		shapeDefinition.density = 0.0001f;
 		shapeDefinition.friction = 1.0f;
 		shapeDefinition.restitution = 0.0f;
@@ -364,7 +364,8 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 			}
 			else
 			{
-				characterAnimationSequence = animationGraph->FindAnimationSequence(characterAnimationInstance, "walk-right");
+				characterAnimationSequence =
+					animationGraph->FindAnimationSequence(characterAnimationInstance, "walk-right");
 			}
 		}
 		if (stickDirection.x < 0)
@@ -376,7 +377,8 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 			}
 			else
 			{
-				characterAnimationSequence = animationGraph->FindAnimationSequence(characterAnimationInstance, "walk-left");
+				characterAnimationSequence =
+					animationGraph->FindAnimationSequence(characterAnimationInstance, "walk-left");
 			}
 		}
 	}
@@ -407,57 +409,26 @@ void SampleGame::OnDraw(const f32 deltaTime)
 
 	physicsWorld.DrawSettingsUI();
 
-
 	const auto& animation = animations[characterAnimationInstance.currentNodeIndex];
 	const auto& animationKey = animationSequences[animation.animationIndex + characterAnimationInstance.key];
 	const auto& frame = animationFrames[animationKey.frameIndex];
 
-	const auto& huskSpriteTexture = renderContext->Get(huskTexture);
-
-	const auto srcRect = frame.sourceSprite;
-	auto uv0 = (srcRect.position) / vec2{ huskSpriteTexture.width, huskSpriteTexture.height };
-	auto uv1 = (srcRect.position + srcRect.extent) / vec2{ huskSpriteTexture.width, huskSpriteTexture.height };
-
-
-	if (animationKey.flip == FrameFlip::horizontal)
-	{
-		const auto x = uv0.x;
-		uv0.x = uv1.x;
-		uv1.x = x;
-	}
-
-	ImGui::Image((ImTextureID)huskSpriteTexture.nativeHandle, ImVec2{ srcRect.extent.x, srcRect.extent.y }, uv0, uv1);
-
-	auto& drawList = *ImGui::GetBackgroundDrawList();
-
 	const auto body = b2Shape_GetBody(controller.collider);
 	const auto transform = b2Body_GetTransform(body);
 
-	const auto frameAspectRation = srcRect.extent.x / srcRect.extent.y;
-	const auto p0 = CastTo<vec2>(b2TransformPoint(transform, b2Vec2{ -1.0f * frameAspectRation, -1.0 } * 120.0f));
-	const auto p1 = CastTo<vec2>(b2TransformPoint(transform, b2Vec2{ -1.0f * frameAspectRation, 1.0 } * 120.0f));
-	const auto p2 = CastTo<vec2>(b2TransformPoint(transform, b2Vec2{ 1.0f * frameAspectRation, 1.0 } * 120.0f));
-	const auto p3 = CastTo<vec2>(b2TransformPoint(transform, b2Vec2{ 1.0f * frameAspectRation, -1.0 } * 120.0f));
+	const auto frameAspectRation = frame.sourceSprite.extent.x / frame.sourceSprite.extent.y;
 
-	drawList.AddImageQuad((ImTextureID)huskSpriteTexture.nativeHandle, p0, p1, p2, p3, uv0, vec2{ uv0.x, uv1.y }, uv1,
-						  vec2{ uv1.x, uv0.y });
+	
 
+	renderContext->Clear(Colors::CornflowerBlue);
 
-	ImGui::Image((ImTextureID)huskSpriteTexture.nativeHandle,
-				 vec2{ huskSpriteTexture.width, huskSpriteTexture.height } / 8.0f);
-	ImGui::SameLine();
+	spriteBatch->Begin();
+	const auto origin = frame.sourceSprite.position + vec2{ frame.sourceSprite.extent.x / 2.0f, 0.0f };
+	const auto extent = vec2{ 240 * frameAspectRation, 240 };
+	spriteBatch->Draw(huskTexture, frame.sourceSprite, Rectangle{ CastTo<vec2>(transform.p) - extent / 2.0f, extent },
+					  Colors::White,
+					  animationKey.flip == FrameFlip::horizontal ? FlipSprite::horizontal : FlipSprite::none, origin);
+	spriteBatch->End();
 
 	physicsWorld.DebugDraw();
-
-	/*spriteBatch.Begin();
-	spriteBatch.Draw(texture1, vec2{ 0.0f, 0.0f });
-	spriteBatch.End();
-
-
-
-	const auto& spriteFramebuffer = game.renderContext->Get(spriteBatchFramebuffer);
-	const auto& spriteColorTexture = game.renderContext->Get(spriteFramebuffer.colorAttachment[0]);
-	const auto& spriteDepthTexture = game.renderContext->Get(spriteFramebuffer.depthAttachment.value());
-
-	ImGui::Image((ImTextureID)spriteColorTexture.nativeHandle, vec2{ windowWidth, windowHeight } / 4.0f);*/
 }

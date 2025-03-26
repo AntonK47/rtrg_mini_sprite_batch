@@ -3,12 +3,15 @@
 in block
 {
 	vec2 Texcoord;
+	vec3 Color;
 } In;
 
-uniform sampler2D texture;
+layout(binding = 0) uniform sampler2D basicTexture;
 layout(location = 0) out vec4 Color;
 
 void main()
 {
-	Color = vec4(In.Texcoord,0.0f,1.0f);
+	vec4 textureColor = texture(basicTexture, In.Texcoord).rgba;
+	textureColor.rgb = textureColor.rgb * In.Color;
+	Color = vec4(textureColor);
 }

@@ -2,26 +2,31 @@
 
 #include <vector>
 
+#include "Color.hpp"
 #include "Common.hpp"
+#include "RenderResources.hpp"
 
-struct Color
-{
-	u8 r;
-	u8 g;
-	u8 b;
-	u8 a;
-};
-namespace Colors
-{
-	inline constexpr Color White = Color{ 255, 255, 255, 255 };
-	inline constexpr Color Black = Color{ 0, 0, 0, 255 };
-} // namespace Colors
-
-struct SpriteTexture
-{
-};
 
 struct RenderContext;
+
+struct Buffer
+{
+	GLuint nativeHandle;
+	void* mappedPtr{ nullptr };
+};
+
+struct SpriteBatchConstants
+{
+	vec2 viewportSize;
+};
+
+enum class FlipSprite
+{
+	none,
+	horizontal,
+	vertical,
+	horizontalAndVertical
+};
 
 struct SpriteBatch
 {
@@ -31,13 +36,28 @@ struct SpriteBatch
 	void Begin();
 	void End();
 
-	void Draw(const SpriteTexture texture, const vec2& postion, const Color& color = Colors::White);
+	void Draw(const Texture2DHandle texture, const vec2& postion, const Color& color = Colors::White);
+	void Draw(const Texture2DHandle texture, const Rectangle& destination, const Color& color = Colors::White);
+	void Draw(const Texture2DHandle texture, const Rectangle& source, const Rectangle& destination,
+			  const Color& color = Colors::White, const FlipSprite flip = FlipSprite::none,
+			  const vec2& origin = vec2{ 0.0f, 0.0f }, float rotation = 0.0f,
+			  float layer = 0.0f);
+
+private:
+	GraphicsPipelineHandle defaultSpriteBatchPipeline;
+	Buffer uniformBuffer;
+	u32 uniformConstantsSize{};
 
 public:
 	struct SpriteInfo
 	{
-		SpriteTexture texture;
-		vec2 position;
+		Texture2DHandle texture;
+		Rectangle source;
+		Rectangle destination;
+		FlipSprite flip;
+		vec2 origin;
+		float rotation;
+		float layer;
 		Color color;
 	};
 	std::vector<SpriteBatch::SpriteInfo> spriteInfos;
@@ -46,4 +66,5 @@ public:
 	GLuint vertexBuffer;
 	GLuint vertexArrayObject;
 	const u32 defaultBufferSize = 16 * 1024 * 1024;
+	RenderContext* renderContext;
 };

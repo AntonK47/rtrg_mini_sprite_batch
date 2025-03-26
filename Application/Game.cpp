@@ -11,7 +11,6 @@
 #include "ContentManager.hpp"
 #include "ImGui.hpp"
 #include "RenderContext.hpp"
-#include "SpriteBatch.hpp"
 
 namespace
 {
@@ -102,37 +101,7 @@ public:
 			std::make_unique<RenderContext>(static_cast<u32>(windowWidth), static_cast<u32>(windowHeight));
 
 		game.content = std::make_unique<ContentManager>(game.renderContext.get(), "Assets");
-
-
-		auto spriteBatchFramebuffer = game.renderContext->CreateFramebuffer(FramebufferDescriptor{
-			.colorAttachment = { Texture2DDescriptor{ .extent = DynamicExtent{},
-													  .format = TextureFormat::rgba8,
-													  .debugName = "sprites_color_render_target" } },
-			.depthAttachment = Texture2DDescriptor{ .extent = DynamicExtent{},
-													.format = TextureFormat::d32f,
-													.debugName = "sprites_depth_render_target" },
-			.debugName = "sprites_fb" });
-
-
-		const auto defaultSpriteBatchPipeline = game.renderContext->CreateGraphicsPipeline(GraphicsPipelineDescriptor{
-			.vertexShaderCode = { game.content->LoadText("Shaders/DefaultSpriteBatch.vert"),
-								  "Shaders/DefaultSpriteBatch.vert" },
-			.fragmentShaderCode = { game.content->LoadText("Shaders/DefaultSpriteBatch.frag"),
-									"Shaders/DefaultSpriteBatch.frag" },
-			.debugName = "DefaultSpriteBatchPipeline" });
-
-
-		SpriteBatch spriteBatch(game.renderContext.get());
-		SpriteTexture texture1;
-		SpriteTexture texture2;
-
-		const auto fullscreenQuadPipeline = game.renderContext->CreateGraphicsPipeline(
-			GraphicsPipelineDescriptor{ .vertexShaderCode = { game.content->LoadText("Shaders/FullscreenBlit.vert"),
-															  "Shaders/FullscreenBlit.vert" },
-										.fragmentShaderCode = { game.content->LoadText("Shaders/FullscreenBlit.frag"),
-																"Shaders/FullscreenBlit.frag" },
-										.debugName = "fullscreenQuadPipeline" });
-
+	
 
 		game.OnLoad();
 
@@ -169,66 +138,17 @@ public:
 			ImGui::NewFrame();
 
 			game.OnUpdate(io.DeltaTime);
+			
 			game.OnDraw(io.DeltaTime);
-
-			spriteBatch.Begin();
-			spriteBatch.Draw(texture1, vec2{ 0.0f, 0.0f });
-			spriteBatch.End();
-
-
-			/*
-						ImGui::Image((ImTextureID)huskSpriteTexture.nativeHandle, vec2{ huskSpriteTexture.width,
-			   huskSpriteTexture.height } / 8.0f); ImGui::SameLine();*/
-
-			const auto& spriteFramebuffer = game.renderContext->Get(spriteBatchFramebuffer);
-			const auto& spriteColorTexture = game.renderContext->Get(spriteFramebuffer.colorAttachment[0]);
-			const auto& spriteDepthTexture = game.renderContext->Get(spriteFramebuffer.depthAttachment.value());
-
-			ImGui::Image((ImTextureID)spriteColorTexture.nativeHandle, vec2{ windowWidth, windowHeight } / 4.0f);
-
 			ImGui::Render();
-
-			//---------PASS--------------------------------
-			glViewport(0, 0, windowWidth, windowHeight);
-			glClipControl(GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE);
-			glFrontFace(GL_CCW);
-			glCullFace(GL_BACK);
-
-			glEnable(GL_CULL_FACE);
-
-			const auto colorClearValue = std::array{ 1.0f, 1.0f, 1.0f, 0.0f };
-			glClearNamedFramebufferfv(spriteFramebuffer.nativeHandle, GL_COLOR, 0, colorClearValue.data());
-			glClearNamedFramebufferfi(spriteFramebuffer.nativeHandle, GL_DEPTH_STENCIL, 0, 0.0f, 0);
-
-			glBindFramebuffer(GL_FRAMEBUFFER, spriteFramebuffer.nativeHandle);
-
-			glBindProgramPipeline(game.renderContext->Get(defaultSpriteBatchPipeline).nativeHandle);
-			glBindVertexArray(spriteBatch.vertexArrayObject);
-			// TODO:glBindTextureUnit, glBindSamplers, glBindBufferRange for uniforms
-			glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 6 * 3, 1, 0);
-			//---------------------------------------------
-
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-			constexpr auto clearColor = vec4(100.0f / 255.f, 149.f / 255.f, 237.f / 255.f, 1.00f);
-			glClearColor(clearColor.x * clearColor.w, clearColor.y * clearColor.w, clearColor.z * clearColor.w,
-						 clearColor.w);
-			glClear(GL_COLOR_BUFFER_BIT);
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			glBindProgramPipeline(game.renderContext->Get(fullscreenQuadPipeline).nativeHandle);
-			glBindTextureUnit(0, spriteColorTexture.nativeHandle);
-
-			glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 3, 1, 0);
-			glDisable(GL_BLEND);
+			game.renderContext->Blit();
+			
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			SDL_GL_SwapWindow(window);
 		}
-
+		
 		game.OnUnload();
-		game.renderContext->DestroyGraphicsPipeline(fullscreenQuadPipeline);
-		game.renderContext->DestroyGraphicsPipeline(defaultSpriteBatchPipeline);
-		game.renderContext->DestroyFramebuffer(spriteBatchFramebuffer);
+		
 
 		ImGui_ImplOpenGL3_Shutdown();
 		ImGui_ImplSDL3_Shutdown();

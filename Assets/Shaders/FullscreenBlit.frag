@@ -3,6 +3,7 @@
 layout(binding = 0) uniform sampler2D basicTexture;
 
 layout(location = 0, index = 0) out vec4 color;
+//TODO: add viewport size, to upscale while bliting
 
 void main()
 {

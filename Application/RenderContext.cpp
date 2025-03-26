@@ -2,6 +2,8 @@
 #include <assert.h>
 
 #include <glm/glm.hpp>
+#include "Color.hpp"
+#include "ContentManager.hpp"
 
 namespace
 {
@@ -85,10 +87,56 @@ void RenderContext::UpdateWindowSize(const u32 width, const u32 height)
 RenderContext::RenderContext(const u32 width, const u32 height)
 {
 	windowContext = { .width = width, .height = height };
+
+	auto content = ContentManager{ this, "Assets" };
+	fullscreenQuadPipeline = CreateGraphicsPipeline(GraphicsPipelineDescriptor{
+		.vertexShaderCode = { content.LoadText("Shaders/FullscreenBlit.vert"), "Shaders/FullscreenBlit.vert" },
+		.fragmentShaderCode = { content.LoadText("Shaders/FullscreenBlit.frag"), "Shaders/FullscreenBlit.frag" },
+		.debugName = "fullscreenQuadPipeline" });
+
+	defaultFramebuffer = CreateFramebuffer(FramebufferDescriptor{
+		.colorAttachment = { Texture2DDescriptor{
+			.extent = DynamicExtent{}, .format = TextureFormat::rgba8, .debugName = "default_color_render_target" } },
+		.depthAttachment = Texture2DDescriptor{ .extent = DynamicExtent{},
+												.format = TextureFormat::d32f,
+												.debugName = "default_depth_render_target" },
+		.debugName = "default_fb" });
 }
 
 RenderContext::~RenderContext()
 {
+	DestroyFramebuffer(defaultFramebuffer);
+	DestroyGraphicsPipeline(fullscreenQuadPipeline);
+}
+
+void RenderContext::Blit()
+{
+	const auto& framebuffer = Get(defaultFramebuffer);
+	const auto& colorTexture = Get(framebuffer.colorAttachment[0]);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, windowContext.width, windowContext.height);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBindProgramPipeline(Get(fullscreenQuadPipeline).nativeHandle);
+	glBindTextureUnit(0, colorTexture.nativeHandle);
+	glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 3, 1, 0);
+	glDisable(GL_BLEND);
+}
+
+void RenderContext::Clear(const Color& color)
+{
+	const auto& framebuffer = Get(defaultFramebuffer);
+	const auto colorClearValue = std::array{ 0.0f, 0.0f, 0.0f, 0.0f };
+	glClearNamedFramebufferfv(framebuffer.nativeHandle, GL_COLOR, 0, colorClearValue.data());
+	glClearNamedFramebufferfi(framebuffer.nativeHandle, GL_DEPTH_STENCIL, 0, 0.0f, 0);
+
+	{
+		const auto clearColor = vec4(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.0f);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glClearColor(clearColor.x * clearColor.w, clearColor.y * clearColor.w, clearColor.z * clearColor.w,
+					 clearColor.w);
+		glClear(GL_COLOR_BUFFER_BIT);
+	}
 }
 
 void RenderContext::RecreateWindowSizeDependentResources()
