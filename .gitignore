@@ -40,3 +40,4 @@ CMakeUserPresets.json
 
 !Assets/**
 /Assets/Meshes
+/Assets/Textures
