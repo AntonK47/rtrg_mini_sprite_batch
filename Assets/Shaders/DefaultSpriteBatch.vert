@@ -7,6 +7,7 @@ layout(location = 2) in vec3 Color;
 layout(binding = 0) uniform spriteBatchConstants
 {
 	vec2 viewportSize;
+	mat4 transform;
 } SpriteBatchConstants;
 
 out gl_PerVertex
@@ -24,7 +25,10 @@ void main()
 {
 	float w = SpriteBatchConstants.viewportSize.x;
 	float h = SpriteBatchConstants.viewportSize.y;
-	vec2 p = Position.xy/vec2(w,h);
+
+	vec2 p = vec2(mat3(SpriteBatchConstants.transform) * vec3(Position.xy, 1.0));
+
+	p = p/vec2(w,h);
 	p.y = 1.0-p.y;
 	p = p*2.0f - vec2(1.0f, 1.0f);
 	Out.Texcoord = Texcoord;

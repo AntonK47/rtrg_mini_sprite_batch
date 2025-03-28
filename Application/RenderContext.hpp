@@ -10,6 +10,7 @@
 #include "RenderResources.hpp"
 
 /*================================== SOME IDEAS==============================*/
+/*
 #include <string_view>
 
 struct UniformBlock
@@ -33,7 +34,7 @@ struct Effect
 		   const std::string_view vertexShaderAsset);
 
 protected:
-	void SetFramebuffer(const FramebufferHandle frambuffer);
+	void SetFramebuffer(const FramebufferHandle framebuffer);
 	void SetUniformTexture(const std::string_view uniformTextureName, const Texture2DHandle texture);
 	void SetUniformBlock(const std::string_view uniformBlockName, UniformBlock uniformBlock);
 
@@ -59,7 +60,7 @@ struct CustomEffect
 	{
 	}
 };
-
+*/
 /*=======USAGE========*/
 /*
 

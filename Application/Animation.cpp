@@ -14,7 +14,7 @@ void AnimationGraph::AddTransition(const std::string& from, const std::string& t
 	auto syncKey = i32{ 0 };
 	if (std::holds_alternative<SyncOnKey>(syncBehavior))
 	{
-		const auto sync = std::get<SyncOnKey>(syncBehavior);
+		const auto& sync = std::get<SyncOnKey>(syncBehavior);
 		syncKey = sync.key;
 	}
 	if (std::holds_alternative<SyncOnLastFrame>(syncBehavior))
@@ -45,11 +45,11 @@ AnimationSequence AnimationGraph::FindAnimationSequence(const AnimationInstance&
 
 	auto distances = std::vector<u32>{};
 	auto visited = std::vector<bool>{};
-	auto previes = std::vector<u32>{};
+	auto previews = std::vector<u32>{};
 	const auto nodes = nameToNodeIndexMap.size();
 	distances.resize(nodes);
 	visited.resize(nodes);
-	previes.resize(nodes);
+	previews.resize(nodes);
 
 	constexpr auto maxDistanceValue = std::numeric_limits<decltype(distances)::value_type>::max();
 
@@ -89,7 +89,7 @@ AnimationSequence AnimationGraph::FindAnimationSequence(const AnimationInstance&
 			if (foundShortestPath)
 			{
 				distances[transition.nodeIndex] = distances[minimumDistanceIndex] + 1;
-				previes[transition.nodeIndex] = minimumDistanceIndex;
+				previews[transition.nodeIndex] = minimumDistanceIndex;
 			}
 		}
 	}
@@ -98,8 +98,8 @@ AnimationSequence AnimationGraph::FindAnimationSequence(const AnimationInstance&
 	auto tmp = targetNodeIndex;
 	while (tmp != startNodeIndex)
 	{
-		const auto previesNode = previes[tmp];
-		const auto& transition = transitions[previesNode];
+		const auto previewsNode = previews[tmp];
+		const auto& transition = transitions[previewsNode];
 
 		auto animationTransitionKey = 0;
 		for (const auto& animation : transition)
@@ -110,15 +110,15 @@ AnimationSequence AnimationGraph::FindAnimationSequence(const AnimationInstance&
 			}
 		}
 
-		animationSequence.push_back(SequenceItem{ previesNode, animationTransitionKey });
-		tmp = previesNode;
+		animationSequence.push_back(SequenceItem{ previewsNode, animationTransitionKey });
+		tmp = previewsNode;
 	}
 
 	std::reverse(animationSequence.begin(), animationSequence.end());
 	return animationSequence;
 }
 
-AnimationInstance AnimationPlayer::ForwardAnimation(AnimationInstance instance, AnimationSequence& sequence)
+AnimationInstance AnimationPlayer::ForwardAnimation(AnimationInstance instance, AnimationSequence& sequence) const
 {
 	auto newInstance = AnimationInstance{};
 	newInstance.currentNodeIndex = instance.currentNodeIndex;
@@ -143,7 +143,7 @@ AnimationInstance AnimationPlayer::ForwardAnimation(AnimationInstance instance, 
 			const auto& item = sequence.front();
 			if (item.node == newInstance.currentNodeIndex)
 			{
-				if (item.key == -1 or item.key == newInstance.key)
+				if (item.key == -1 or item.key == (i32)newInstance.key)
 				{
 					sequence.erase(std::remove(sequence.begin(), sequence.end(), item), sequence.end());
 					if (not sequence.empty())

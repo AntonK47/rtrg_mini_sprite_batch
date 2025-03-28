@@ -109,10 +109,10 @@ using AnimationSequence = std::vector<SequenceItem>;
 
 struct AnimationPlayer
 {
-	AnimationInstance ForwardAnimation(AnimationInstance instance, AnimationSequence& sequence);
+	AnimationInstance ForwardAnimation(AnimationInstance instance, AnimationSequence& sequence) const;
 	void ForwardTime(const f32 deltaTime);
 
-	f32 localTime;
+	f32 localTime{ 0.0f };
 	f32 frameDuration{ 0.16f };
 	bool nextKey{ false };
 };

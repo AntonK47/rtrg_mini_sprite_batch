@@ -1,7 +1,6 @@
 #include "Game.hpp"
 
 #include <SDL3/SDL.h>
-#include <gli/gli.hpp>
 
 #include <assert.h>
 #include <print>
@@ -14,8 +13,8 @@
 
 namespace
 {
-	void __stdcall MessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
-								   const GLchar* message, const void* userParam)
+	void __stdcall MessageCallback(GLenum, GLenum type, GLuint, GLenum severity, GLsizei, const GLchar* message,
+								   const void*)
 	{
 		std::println(stderr, "GL debug message: {} type = 0x{}, severity = 0x{}, message = {}\n",
 					 (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
@@ -28,6 +27,15 @@ private:
 public:
 	void Run(Game& game, int argc, char* argv[])
 	{
+		for (auto i = 0; i < argc; i++)
+		{
+			if (!strcmp(argv[i], "--disable_resource_download"))
+			{
+				EnableResourceFileDownload = false;
+			}
+		}
+
+
 		// Setup SDL
 		if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
 		{
@@ -68,8 +76,7 @@ public:
 			return;
 		}
 
-		int version = gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress);
-		// std::println("GL {}.{}\n", version, version);
+		gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress);
 
 		SDL_GL_MakeCurrent(window, gl_context);
 		SDL_GL_SetSwapInterval(1); // Enable vsync
@@ -101,7 +108,7 @@ public:
 			std::make_unique<RenderContext>(static_cast<u32>(windowWidth), static_cast<u32>(windowHeight));
 
 		game.content = std::make_unique<ContentManager>(game.renderContext.get(), "Assets");
-	
+
 
 		game.OnLoad();
 
@@ -138,17 +145,17 @@ public:
 			ImGui::NewFrame();
 
 			game.OnUpdate(io.DeltaTime);
-			
+
 			game.OnDraw(io.DeltaTime);
 			ImGui::Render();
 			game.renderContext->Blit();
-			
+
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			SDL_GL_SwapWindow(window);
 		}
-		
+
 		game.OnUnload();
-		
+
 
 		ImGui_ImplOpenGL3_Shutdown();
 		ImGui_ImplSDL3_Shutdown();

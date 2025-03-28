@@ -6,11 +6,10 @@
 #include "ImGui.hpp"
 #include "RenderContext.hpp"
 
-
 struct CharacterController
 {
-	vec2 position;
-	b2ShapeId collider;
+	vec2 position{};
+	b2ShapeId collider{};
 
 	bool hasLeftSensorHitFloor{ true };
 	bool hasMidSensorHitFloor{ true };
@@ -19,7 +18,7 @@ struct CharacterController
 	vec2 floorNormal{};
 };
 
-CharacterController controller;
+CharacterController controller{};
 
 struct PhysicsWorld
 {
@@ -32,85 +31,108 @@ struct PhysicsWorld
 
 	std::vector<b2ShapeId> shapes;
 
-	PhysicsWorld()
+	PhysicsWorld(SampleGame* game)
 	{
 		debugDraw = b2DefaultDebugDraw();
 
 		debugDraw.DrawSegment = [](b2Vec2 p1, b2Vec2 p2, b2HexColor color, void* context)
 		{
+			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
-			drawList.AddLine(vec2(p1.x, p1.y), vec2(p2.x, p2.y),
-							 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color, debugLinesThickness);
+
+			const auto pp1 = vec2(game->cameraMatrix * vec3(p1.x, p1.y, 1.0f));
+			const auto pp2 = vec2(game->cameraMatrix * vec3(p2.x, p2.y, 1.0f));
+			drawList.AddLine(pp1, pp2, ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color,
+							 debugLinesThickness);
 		};
 		debugDraw.DrawPolygon = [](const b2Vec2* vertices, int vertexCount, b2HexColor color, void* context)
 		{
+			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
-			drawList.AddPolyline((ImVec2*)vertices, vertexCount,
+			auto points = std::vector<vec2>{};
+			points.resize(vertexCount);
+			for (auto i = 0; i < vertexCount; i++)
+			{
+				points[i] = vec2(game->cameraMatrix * vec3(vertices[i].x, vertices[i].y, 1.0f));
+			}
+			drawList.AddPolyline((ImVec2*)points.data(), vertexCount,
 								 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color, ImDrawFlags_Closed,
 								 debugLinesThickness);
 		};
-		debugDraw.DrawSolidPolygon = [](b2Transform transform, const b2Vec2* vertices, int vertexCount, float radius,
+		debugDraw.DrawSolidPolygon = [](b2Transform transform, const b2Vec2* vertices, int vertexCount, [[maybe_unused]] float radius,
 										b2HexColor color, void* context)
 		{
+			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
 			auto points = std::vector<vec2>{};
 			points.resize(vertexCount);
 			for (auto i = 0; i < vertexCount; i++)
 			{
 				const auto pos = b2TransformPoint(transform, vertices[i]);
-				points[i] = vec2(pos.x, pos.y);
+				points[i] = vec2(game->cameraMatrix * vec3(pos.x, pos.y, 1.0f));
 			}
 
-			drawList.AddConcavePolyFilled((ImVec2*)points.data(), points.size(),
+			drawList.AddConcavePolyFilled((ImVec2*)points.data(), static_cast<int>(points.size()),
 										  ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
 		};
 		debugDraw.DrawCircle = [](b2Vec2 center, float radius, b2HexColor color, void* context)
 		{
+			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
-			drawList.AddCircle(CastTo<vec2>(center), radius,
-							   ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color, debugLinesThickness);
+			drawList.AddCircle(vec2(game->cameraMatrix * vec3(CastTo<vec2>(center), 1.0f)), radius,
+							   ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color, static_cast<int>(debugLinesThickness));
 		};
 		debugDraw.DrawSolidCircle = [](b2Transform transform, float radius, b2HexColor color, void* context)
 		{
+			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
 			const auto center = b2TransformPoint(transform, b2Vec2{ 0.0f, 0.0f });
-			drawList.AddCircleFilled(CastTo<vec2>(center), radius,
+			drawList.AddCircleFilled(vec2(game->cameraMatrix * vec3(CastTo<vec2>(center), 1.0f)), radius,
 									 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
 		};
 		debugDraw.DrawSolidCapsule = [](b2Vec2 p1, b2Vec2 p2, float radius, b2HexColor color, void* context)
 		{
+			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
-			drawList.AddCircleFilled(CastTo<vec2>(p1), radius,
+			drawList.AddCircleFilled(vec2(game->cameraMatrix * vec3(CastTo<vec2>(p1), 1.0f)), radius,
 									 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
-			drawList.AddCircleFilled(CastTo<vec2>(p2), radius,
+			drawList.AddCircleFilled(vec2(game->cameraMatrix * vec3(CastTo<vec2>(p2), 1.0f)), radius,
 									 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
 		};
 
 		debugDraw.DrawString = [](b2Vec2 p, const char* s, b2HexColor color, void* context)
 		{
+			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
-			drawList.AddText(vec2(p.x, p.y), ImColor{ 0.0f, 0.0f, 0.0f, 1.0 } + color, s);
+			drawList.AddText(vec2(game->cameraMatrix * vec3(CastTo<vec2>(p), 1.0f)),
+							 ImColor{ 0.0f, 0.0f, 0.0f, 1.0 } + color, s);
 		};
 		debugDraw.DrawTransform = [](b2Transform transform, void* context)
 		{
+			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
-			const auto origin = CastTo<vec2>(transform.p);
+			const auto origin = vec2(game->cameraMatrix * vec3(CastTo<vec2>(transform.p), 1.0f));
 			const auto upDirection = CastTo<vec2>(b2RotateVector(transform.q, b2Vec2{ 0.0, 1.0 }));
 			const auto rightDirection = CastTo<vec2>(b2RotateVector(transform.q, b2Vec2{ 1.0, 0.0 }));
 
-			drawList.AddLine(origin, origin + upDirection * 100.0f, ImColor{ 1.0f, 0.0f, 0.0f, debugLayerTransparency },
-							 debugLinesThickness);
-			drawList.AddLine(origin, origin + rightDirection * 100.0f,
+			drawList.AddLine(origin,
+							 vec2(game->cameraMatrix * vec3(CastTo<vec2>(transform.p) + upDirection * 100.0f, 1.0f)),
+							 ImColor{ 1.0f, 0.0f, 0.0f, debugLayerTransparency }, debugLinesThickness);
+			drawList.AddLine(origin,
+							 vec2(game->cameraMatrix * vec3(CastTo<vec2>(transform.p) + rightDirection * 100.0f, 1.0f)),
 							 ImColor{ 0.0f, 0.0f, 1.0f, debugLayerTransparency }, debugLinesThickness);
 		};
 
 		debugDraw.DrawPoint = [](b2Vec2 p, float size, b2HexColor color, void* context)
 		{
+			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
-			drawList.AddCircle(CastTo<vec2>(p), size, ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
+			drawList.AddCircle(vec2(game->cameraMatrix * vec3(CastTo<vec2>(p), 1.0f)), size,
+							   ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
 		};
 
 		debugDraw.drawShapes = true;
+		debugDraw.context = game;
 
 		auto worldDefinition = b2DefaultWorldDef();
 		worldDefinition.gravity = CastTo<b2Vec2>(vec2{ 0.0f, 10.0f } * pixelPerMeter);
@@ -139,10 +161,12 @@ struct PhysicsWorld
 	}
 };
 
-PhysicsWorld physicsWorld;
+std::unique_ptr<PhysicsWorld> physicsWorld;
 
 SampleGame::SampleGame()
 {
+	cameraMatrix = glm::identity<mat3>();
+	physicsWorld = std::make_unique<PhysicsWorld>(this);
 }
 
 void SampleGame::OnLoad()
@@ -180,35 +204,35 @@ void SampleGame::OnLoad()
 		auto bodyDefinition = b2DefaultBodyDef();
 		bodyDefinition.position = CastTo<b2Vec2>(vec2{ 400.0f, 500.0f });
 		bodyDefinition.name = "floor_0";
-		auto body = b2CreateBody(physicsWorld.worldId, &bodyDefinition);
+		auto body = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
 
 		auto box = b2MakeBox(300.0f, 10.0f);
 		const auto shapeDefinition = b2DefaultShapeDef();
 		const auto shape = b2CreatePolygonShape(body, &shapeDefinition, &box);
-		physicsWorld.shapes.push_back(shape);
+		physicsWorld->shapes.push_back(shape);
 	}
 	{
 		auto bodyDefinition = b2DefaultBodyDef();
 		bodyDefinition.position = CastTo<b2Vec2>(vec2{ 900.0f, 900.0f });
 		bodyDefinition.name = "floor_1";
-		auto body = b2CreateBody(physicsWorld.worldId, &bodyDefinition);
+		auto body = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
 
 		auto box = b2MakeBox(40.0f, 10.0f);
 		const auto shapeDefinition = b2DefaultShapeDef();
 		const auto shape = b2CreatePolygonShape(body, &shapeDefinition, &box);
-		physicsWorld.shapes.push_back(shape);
+		physicsWorld->shapes.push_back(shape);
 	}
 	{
 		auto bodyDefinition = b2DefaultBodyDef();
 		bodyDefinition.position = CastTo<b2Vec2>(vec2{ 1900.0f, 900.0f });
 		bodyDefinition.name = "floor_3";
 		bodyDefinition.rotation = b2MakeRot(0.15f * B2_PI);
-		auto bodyId = b2CreateBody(physicsWorld.worldId, &bodyDefinition);
+		auto bodyId = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
 
 		auto box = b2MakeBox(400.0f, 10.0f);
 		const auto shapeDefinition = b2DefaultShapeDef();
 		const auto shape = b2CreatePolygonShape(bodyId, &shapeDefinition, &box);
-		physicsWorld.shapes.push_back(shape);
+		physicsWorld->shapes.push_back(shape);
 	}
 	{
 		auto bodyDefinition = b2DefaultBodyDef();
@@ -218,7 +242,7 @@ void SampleGame::OnLoad()
 		bodyDefinition.name = "dynamic_element";
 		bodyDefinition.fixedRotation = true;
 
-		const auto body = b2CreateBody(physicsWorld.worldId, &bodyDefinition);
+		const auto body = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
 		const auto box = b2MakeBox(100.0f, 100.0f);
 
 
@@ -228,12 +252,12 @@ void SampleGame::OnLoad()
 		shapeDefinition.friction = 1.0f;
 		shapeDefinition.restitution = 0.0f;
 
-		auto capsulDefinition = b2Capsule{ .center1 = CastTo<b2Vec2>(vec2{ 0.0f, -40.0f }),
+		auto capsuleDefinition = b2Capsule{ .center1 = CastTo<b2Vec2>(vec2{ 0.0f, -40.0f }),
 										   .center2 = CastTo<b2Vec2>(vec2{ 0.0f, 80.0f }),
 										   .radius = 40 };
-		const auto shape = b2CreateCapsuleShape(body, &shapeDefinition, &capsulDefinition);
+		const auto shape = b2CreateCapsuleShape(body, &shapeDefinition, &capsuleDefinition);
 		controller.collider = shape;
-		physicsWorld.shapes.push_back(shape);
+		physicsWorld->shapes.push_back(shape);
 	}
 }
 
@@ -251,7 +275,7 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 	{
 
 		const auto leftRayOrigin = controller.position + vec2{ -150.0f, 0.0f };
-		const auto leftRayResult = b2World_CastRayClosest(physicsWorld.worldId, CastTo<b2Vec2>(leftRayOrigin),
+		const auto leftRayResult = b2World_CastRayClosest(physicsWorld->worldId, CastTo<b2Vec2>(leftRayOrigin),
 														  CastTo<b2Vec2>(vec2{ 0.0f, 400.0f }), b2DefaultQueryFilter());
 		controller.hasLeftSensorHitFloor =
 			leftRayResult.hit and glm::distance(CastTo<vec2>(leftRayResult.point), leftRayOrigin) < 150.0f;
@@ -259,7 +283,7 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 	{
 
 		const auto midRayOrigin = controller.position;
-		const auto midRayResult = b2World_CastRayClosest(physicsWorld.worldId, CastTo<b2Vec2>(midRayOrigin),
+		const auto midRayResult = b2World_CastRayClosest(physicsWorld->worldId, CastTo<b2Vec2>(midRayOrigin),
 														 CastTo<b2Vec2>(vec2{ 0.0f, 400.0f }), b2DefaultQueryFilter());
 		controller.hasMidSensorHitFloor =
 			midRayResult.hit and glm::distance(CastTo<vec2>(midRayResult.point), midRayOrigin) < 150.0f;
@@ -269,7 +293,7 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 
 		const auto rightRayOrigin = controller.position + vec2{ 150.0f, 0.0f };
 		const auto rightRayResult =
-			b2World_CastRayClosest(physicsWorld.worldId, CastTo<b2Vec2>(rightRayOrigin),
+			b2World_CastRayClosest(physicsWorld->worldId, CastTo<b2Vec2>(rightRayOrigin),
 								   CastTo<b2Vec2>(vec2{ 0.0f, 400.0f }), b2DefaultQueryFilter());
 		controller.hasRightSensorHitFloor =
 			rightRayResult.hit and glm::distance(CastTo<vec2>(rightRayResult.point), rightRayOrigin) < 150.0f;
@@ -277,7 +301,19 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 
 	const auto stickDirection = (vec2)ImGui::GetKeyMagnitude2d(ImGuiKey_GamepadLStickLeft, ImGuiKey_GamepadLStickRight,
 															   ImGuiKey_GamepadLStickUp, ImGuiKey_GamepadLStickDown);
+	const auto rightStickDirection = (vec2)ImGui::GetKeyMagnitude2d(
+		ImGuiKey_GamepadRStickLeft, ImGuiKey_GamepadRStickRight, ImGuiKey_GamepadRStickUp, ImGuiKey_GamepadRStickDown);
 
+	const auto rotation =
+		ImGui::GetKeyData(ImGuiKey_GamepadL2)->AnalogValue - ImGui::GetKeyData(ImGuiKey_GamepadR2)->AnalogValue;
+
+	cameraMatrix = glm::translate(cameraMatrix, rightStickDirection * 1000.0f * deltaTime);
+	static auto origin =
+		vec2(renderContext->GetWindowsContext().width / 2, renderContext->GetWindowsContext().height / 2);
+	origin -= rightStickDirection * 1000.0f * deltaTime;
+	cameraMatrix = glm::translate(cameraMatrix, origin);
+	cameraMatrix = glm::rotate(cameraMatrix, glm::radians(rotation * 180 * deltaTime));
+	cameraMatrix = glm::translate(cameraMatrix, -origin);
 
 	ImGui::SliderFloat2("left_stick", (float*)(&stickDirection), -1.0f, 1.0f);
 
@@ -294,16 +330,16 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 		const auto body = b2Shape_GetBody(controller.collider);
 		const auto forceSourcePosition = vec2{ ImGui::GetMousePos() };
 		const auto bodyPosition = CastTo<vec2>(b2Body_GetPosition(body));
-		const auto distance = glm::distance(forceSourcePosition, bodyPosition) / physicsWorld.pixelPerMeter;
+		const auto distance = glm::distance(forceSourcePosition, bodyPosition) / physicsWorld->pixelPerMeter;
 		const auto forceFactor = 1.0f / (std::clamp(distance, 1.0f, 10.0f));
 		const auto forceAtSource =
-			glm::normalize(forceSourcePosition - bodyPosition) * physicsWorld.pixelPerMeter * 4.0f;
+			glm::normalize(forceSourcePosition - bodyPosition) * physicsWorld->pixelPerMeter * 4.0f;
 		const auto force = forceAtSource * forceFactor;
 
 		b2Body_ApplyForce(body, CastTo<b2Vec2>(force), CastTo<b2Vec2>(forceSourcePosition), true);
 	}
 
-	b2World_Step(physicsWorld.worldId, deltaTime, 8);
+	b2World_Step(physicsWorld->worldId, deltaTime, 8);
 
 	controller.position = CastTo<vec2>(b2Body_GetPosition(b2Shape_GetBody(controller.collider)));
 
@@ -399,7 +435,7 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 	b2Body_ApplyLinearImpulseToCenter(body, CastTo<b2Vec2>(f), true);
 }
 
-void SampleGame::OnDraw(const f32 deltaTime)
+void SampleGame::OnDraw([[maybe_unused]] const f32 deltaTime)
 {
 	static auto showDemoWindow = true;
 	if (showDemoWindow)
@@ -407,10 +443,11 @@ void SampleGame::OnDraw(const f32 deltaTime)
 		ImGui::ShowDemoWindow(&showDemoWindow);
 	}
 
-	physicsWorld.DrawSettingsUI();
+	physicsWorld->DrawSettingsUI();
 
 	const auto& animation = animations[characterAnimationInstance.currentNodeIndex];
-	const auto& animationKey = animationSequences[animation.animationIndex + characterAnimationInstance.key];
+	const auto sequenceIndex = animation.animationIndex + characterAnimationInstance.key;
+	const auto& animationKey = animationSequences[sequenceIndex];
 	const auto& frame = animationFrames[animationKey.frameIndex];
 
 	const auto body = b2Shape_GetBody(controller.collider);
@@ -418,11 +455,11 @@ void SampleGame::OnDraw(const f32 deltaTime)
 
 	const auto frameAspectRation = frame.sourceSprite.extent.x / frame.sourceSprite.extent.y;
 
-	
 
 	renderContext->Clear(Colors::CornflowerBlue);
 
-	spriteBatch->Begin();
+
+	spriteBatch->Begin(cameraMatrix);
 	const auto origin = frame.sourceSprite.position + vec2{ frame.sourceSprite.extent.x / 2.0f, 0.0f };
 	const auto extent = vec2{ 240 * frameAspectRation, 240 };
 	spriteBatch->Draw(huskTexture, frame.sourceSprite, Rectangle{ CastTo<vec2>(transform.p) - extent / 2.0f, extent },
@@ -430,5 +467,5 @@ void SampleGame::OnDraw(const f32 deltaTime)
 					  animationKey.flip == FrameFlip::horizontal ? FlipSprite::horizontal : FlipSprite::none, origin);
 	spriteBatch->End();
 
-	physicsWorld.DebugDraw();
+	physicsWorld->DebugDraw();
 }

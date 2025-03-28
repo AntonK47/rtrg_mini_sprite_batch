@@ -61,8 +61,8 @@ using Extent = std::variant<StaticExtent, DynamicExtent>;
 
 struct Texture2DDescriptor
 {
-	Extent extent;
-	TextureFormat format;
+	Extent extent{};
+	TextureFormat format{TextureFormat::unknown};
 	u8 levels = 1;
 	const char* debugName = "";
 };

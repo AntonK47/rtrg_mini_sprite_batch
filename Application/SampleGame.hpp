@@ -14,6 +14,7 @@ struct SampleGame : Game
 	void OnUpdate(const f32 deltaTime) override;
 	void OnLoad() override;
 	void OnUnload() override;
+	mat3 cameraMatrix{};
 
 private:
 	std::unique_ptr<SpriteBatch> spriteBatch;
@@ -24,4 +25,5 @@ private:
 	AnimationSequence characterAnimationSequence{};
 
 	Texture2DHandle huskTexture{};
+
 };

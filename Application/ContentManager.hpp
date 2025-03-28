@@ -9,6 +9,8 @@ struct RenderContext;
 
 using TextAsset = std::string;
 
+inline bool EnableResourceFileDownload = true;
+
 struct ContentManager
 {
 public:

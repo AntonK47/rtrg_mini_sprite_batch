@@ -4,30 +4,21 @@
 #include "RenderContext.hpp"
 
 #include <algorithm>
-/*
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 
-----------------------------------------------------------------------------
-q1-t1 q2-t2 q3-t1 ..........................................................
-
-q1-t1 q2-t1 q3-t2 ..........................................................
-
-batch1 - q1-q2 	- t1
-batch2 - q1		- t2
-
-glBindProgramPipeline(...);
-glBindVertexArray(...);
-for(batch in batches)
+namespace
 {
-	glBindTextureUnit(batch.texture);
-	glDrawArraysInstancedBaseInstance(GL_TRIANGLES, batch.vertexOffsetAndSize);
-}
-
-
-
-
-
-*/
-
+	TextAsset LoadText(const std::filesystem::path& asset)
+	{
+		auto fullPath = std::filesystem::path{ "Assets" } / asset;
+		auto file = std::ifstream{ fullPath };
+		auto stream = std::ostringstream{};
+		stream << file.rdbuf();
+		return TextAsset{ stream.str() };
+	}
+} // namespace
 #define glLabel(s) (GLuint) strlen(s), s
 
 struct SpriteQuadVertex
@@ -84,12 +75,9 @@ SpriteBatch::SpriteBatch(RenderContext* context) : renderContext(context)
 		GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
 
 
-	auto content = ContentManager{ renderContext, "Assets" };
-
 	defaultSpriteBatchPipeline = renderContext->CreateGraphicsPipeline(GraphicsPipelineDescriptor{
-		.vertexShaderCode = { content.LoadText("Shaders/DefaultSpriteBatch.vert"), "Shaders/DefaultSpriteBatch.vert" },
-		.fragmentShaderCode = { content.LoadText("Shaders/DefaultSpriteBatch.frag"),
-								"Shaders/DefaultSpriteBatch.frag" },
+		.vertexShaderCode = { LoadText("Shaders/DefaultSpriteBatch.vert"), "Shaders/DefaultSpriteBatch.vert" },
+		.fragmentShaderCode = { LoadText("Shaders/DefaultSpriteBatch.frag"), "Shaders/DefaultSpriteBatch.frag" },
 		.debugName = "DefaultSpriteBatchPipeline" });
 }
 
@@ -99,7 +87,7 @@ SpriteBatch::~SpriteBatch()
 	renderContext->DestroyGraphicsPipeline(defaultSpriteBatchPipeline);
 }
 
-void SpriteBatch::Begin()
+void SpriteBatch::Begin(const mat3& transform)
 {
 	const auto& framebuffer = renderContext->Get(renderContext->GetDefaultFramebuffer());
 	const auto& framebufferTexture = renderContext->Get(framebuffer.colorAttachment[0]);
@@ -115,9 +103,11 @@ void SpriteBatch::Begin()
 	glBindProgramPipeline(renderContext->Get(defaultSpriteBatchPipeline).nativeHandle);
 	glBindVertexArray(vertexArrayObject);
 	// TODO:glBindTextureUnit, glBindSamplers, glBindBufferRange for uniforms
-	auto viewportSize =
-		vec2{ static_cast<float>(framebufferTexture.width), static_cast<float>(framebufferTexture.height) };
-	std::memcpy(uniformBuffer.mappedPtr, &viewportSize, sizeof(vec2));
+	const auto uniformConstants =
+		SpriteBatchConstants{ .viewportSize = vec2{ static_cast<float>(framebufferTexture.width),
+													static_cast<float>(framebufferTexture.height) },
+							  .transform = transform };
+	std::memcpy(uniformBuffer.mappedPtr, &uniformConstants, sizeof(SpriteBatchConstants));
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uniformBuffer.nativeHandle, 0, uniformConstantsSize);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

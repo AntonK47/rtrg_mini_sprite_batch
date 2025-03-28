@@ -1,9 +1,11 @@
 #include "RenderContext.hpp"
-#include <assert.h>
-
-#include <glm/glm.hpp>
 #include "Color.hpp"
 #include "ContentManager.hpp"
+
+#include <assert.h>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 
 namespace
 {
@@ -29,7 +31,14 @@ namespace
 		return keyGenerator++;
 	};
 
-
+	TextAsset LoadText(const std::filesystem::path& asset)
+	{
+		auto fullPath = std::filesystem::path{ "Assets" } / asset;
+		auto file = std::ifstream{ fullPath };
+		auto stream = std::ostringstream{};
+		stream << file.rdbuf();
+		return TextAsset{ stream.str() };
+	}
 } // namespace
 
 Framebuffer RenderContext::CreateOpenGlFramebuffer(const FramebufferDescriptor& descriptor)
@@ -88,10 +97,9 @@ RenderContext::RenderContext(const u32 width, const u32 height)
 {
 	windowContext = { .width = width, .height = height };
 
-	auto content = ContentManager{ this, "Assets" };
 	fullscreenQuadPipeline = CreateGraphicsPipeline(GraphicsPipelineDescriptor{
-		.vertexShaderCode = { content.LoadText("Shaders/FullscreenBlit.vert"), "Shaders/FullscreenBlit.vert" },
-		.fragmentShaderCode = { content.LoadText("Shaders/FullscreenBlit.frag"), "Shaders/FullscreenBlit.frag" },
+		.vertexShaderCode = { LoadText("Shaders/FullscreenBlit.vert"), "Shaders/FullscreenBlit.vert" },
+		.fragmentShaderCode = { LoadText("Shaders/FullscreenBlit.frag"), "Shaders/FullscreenBlit.frag" },
 		.debugName = "fullscreenQuadPipeline" });
 
 	defaultFramebuffer = CreateFramebuffer(FramebufferDescriptor{

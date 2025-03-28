@@ -57,21 +57,7 @@ PUBLIC
     ${xatlas_SOURCE_DIR}/source/xatlas/
 )
 
-
 set_target_properties(xatlas PROPERTIES FOLDER "thirdParty/xatlas")
-
-
-
-
-add_library(tiny_dds INTERFACE)
-add_library(tiny_dds::tiny_dds ALIAS tiny_dds)
-
-target_include_directories(tiny_dds
-INTERFACE
-    tinydds/
-)
-set_target_properties(tiny_dds PROPERTIES FOLDER "thirdParty/tiny_dds")
-
 
 FetchContent_Declare(
   box2d
@@ -81,3 +67,26 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(box2d)
 set_target_properties(box2d PROPERTIES FOLDER "thirdParty/box2d")
+
+FetchContent_Declare(
+  vfspp
+  GIT_REPOSITORY https://github.com/nextgeniuspro/vfspp.git
+  GIT_TAG        master
+)
+
+FetchContent_MakeAvailable(vfspp)
+set_target_properties(vfspp PROPERTIES FOLDER "thirdParty/vfspp")
+
+set_target_properties(miniz-cpp.test PROPERTIES FOLDER "thirdParty/miniz")
+set_target_properties(example-pipe PROPERTIES FOLDER "thirdParty/miniz")
+set_target_properties(example-read PROPERTIES FOLDER "thirdParty/miniz")
+set_target_properties(example-write PROPERTIES FOLDER "thirdParty/miniz")
+
+if(MSVC)
+    target_compile_options(imgui PRIVATE /W0)
+    target_compile_options(xatlas PRIVATE /W0)
+    target_compile_options(miniz-cpp.test PRIVATE /W0)
+    target_compile_options(example-pipe PRIVATE /W0)
+    target_compile_options(example-read PRIVATE /W0)
+    target_compile_options(example-write PRIVATE /W0)
+endif()
