@@ -1,7 +1,7 @@
 # TODO
 > The rocket ( :rocket: ) emoji is used to mark priority. More rockets ( :rocket: ) means higher priority. 
 
-> last updated on 29.03.2025
+> last updated on 30.03.2025
 ---
 - [x] create render_context
 	- [x] backbuffer context [width, height] - viewport - scissor
@@ -30,17 +30,17 @@
 	- [x] embed screen coordinate to NDC matrix
 		- [x] test it with mouse position tracing
 - [ ] extend begin interface:
-	- [x] add transform matrix :rocket: :rocket:
+	- [x] add transform matrix
 - [ ] extend draw interface :rocket:
 	- [ ] rotation -> origin
 	- [ ] scale
-	- [ ] layer
-	- [x] texture sampling :rocket: :rocket:
+	- [ ] layer :rocket: :rocket: (see offline tasks)
+	- [x] texture sampling
 	- [x] flip -> horizontal, vertical, both
 	- [ ] add sprites blending state :rocket:
 	
 	#### offline tasks (not related to sprite_batch)
-	- [ ] checkout tiled 2d integration
+	- [x] checkout tiled 2d integration
 	- [x] checkout the box2d for physics and collision detection
 	- [x] add debug visualization for box2d (using sprite_batch or imgui's draw list api)
 	- [x] implement basic character controller 
@@ -52,3 +52,7 @@
 	- [x] create abstract Game class
 	- [ ] split framework and game/application
 	- [ ] move animation data to game/application code
+	---
+	- [ ] build visually interesting level
+	 > For this task we need a ability to render multilayered maps, so we have to handle correctly the depth parameter in sprite_batch. To make it more interesting we can also add some layers with real-time fake lighting by applying the color grading from LUT based on proximity to the light source. This technique require a custom FBO handling and writing of custom shader effects.
+	---
