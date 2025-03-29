@@ -7,7 +7,8 @@
       "features": [ "gl-api-46", "extensions" ]
     },
     "gli",
-    "curl"
+    "curl",
+    "nlohmann-json"
   ],
   "builtin-baseline": "5f8c424e267b7360d451df406eeefb3767985b17"
 }

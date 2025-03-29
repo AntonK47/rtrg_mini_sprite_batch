@@ -5,6 +5,7 @@ find_package(glm CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(gli CONFIG REQUIRED)
 find_package(CURL REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 option(DOWNLOAD_ASSETS "Enables asset downoad on strurtup" ON)
 
@@ -29,6 +30,8 @@ target_sources(${APPLICATION_NAME} PRIVATE
 	SampleGame.hpp
 	ContentManager.cpp
 	ContentManager.hpp
+	MapImporter.hpp
+	MapImporter.cpp
 )
 target_link_libraries(
 	${APPLICATION_NAME} 
@@ -41,6 +44,7 @@ PRIVATE
 	box2d::box2d
 	vfspp::vfspp
 	CURL::libcurl
+	nlohmann_json::nlohmann_json
 )
 if(DOWNLOAD_ASSETS)
 	target_compile_definitions(${APPLICATION_NAME} PUBLIC ENABLE_ASSETS_DOWNLOAD)
