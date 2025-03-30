@@ -41,8 +41,7 @@ struct ContentManager::ContentManagerImpl
 		if (EnableResourceFileDownload)
 		{
 			using namespace std::string_literals;
-
-			const auto url = "https://drive.google.com/uc?id=1gcgAFbgd0LS3wO-BTt5KklyjE9OcOolt&export=download"s;
+			const auto url = "https://drive.google.com/uc?id=1WWYTPwFHTFxR5M0_a58ysKh9He98wcE8&export=download"s;
 			const auto targetFile = std::filesystem::path{ assetRootPath } / "package_00";
 
 			auto curl = curl_easy_init();

@@ -175,15 +175,14 @@ void SpriteBatch::End()
 
 			generatedVertices.push_back(SpriteQuadVertex{ position + vec2{ 0, extent.y }, { uv0.x, uv1.y }, color });
 
-			vertexCount += 6;
-
 			if (lastTexture != spriteInfo.texture)
 			{
-				lastTexture = spriteInfo.texture;
 				batches.push_back(Batch{ lastTexture, vertexOffset, vertexCount });
+				lastTexture = spriteInfo.texture;
 				vertexOffset += vertexCount;
 				vertexCount = 0;
 			}
+			vertexCount += 6;
 		}
 
 		batches.push_back(Batch{ lastTexture, vertexOffset, vertexCount });
@@ -195,6 +194,10 @@ void SpriteBatch::End()
 		{
 			const auto& texture = renderContext->Get(batch.texture);
 			glBindTextureUnit(0, texture.nativeHandle);
+
+			//TODO: we need a proper way to set up a texture sampler
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 			glDrawArraysInstancedBaseInstance(GL_TRIANGLES, batch.vertexOffset, batch.vertexCount, 1, 0);
 		}
 	}

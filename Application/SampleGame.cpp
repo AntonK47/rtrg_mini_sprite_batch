@@ -6,6 +6,10 @@
 #include "ImGui.hpp"
 #include "RenderContext.hpp"
 
+#include "MapImporter.hpp"
+
+using namespace tiled;
+
 struct CharacterController
 {
 	vec2 position{};
@@ -19,6 +23,15 @@ struct CharacterController
 };
 
 CharacterController controller{};
+tiled::TiledMap map{};
+
+struct TileSet
+{
+	u32 firstGlobalId;
+	Texture2DHandle image;
+};
+
+std::vector<TileSet> tileSets{};
 
 struct PhysicsWorld
 {
@@ -59,8 +72,8 @@ struct PhysicsWorld
 								 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color, ImDrawFlags_Closed,
 								 debugLinesThickness);
 		};
-		debugDraw.DrawSolidPolygon = [](b2Transform transform, const b2Vec2* vertices, int vertexCount, [[maybe_unused]] float radius,
-										b2HexColor color, void* context)
+		debugDraw.DrawSolidPolygon = [](b2Transform transform, const b2Vec2* vertices, int vertexCount,
+										[[maybe_unused]] float radius, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
@@ -80,7 +93,8 @@ struct PhysicsWorld
 			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
 			drawList.AddCircle(vec2(game->cameraMatrix * vec3(CastTo<vec2>(center), 1.0f)), radius,
-							   ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color, static_cast<int>(debugLinesThickness));
+							   ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color,
+							   static_cast<int>(debugLinesThickness));
 		};
 		debugDraw.DrawSolidCircle = [](b2Transform transform, float radius, b2HexColor color, void* context)
 		{
@@ -176,6 +190,14 @@ void SampleGame::OnLoad()
 	animationGraph = std::make_unique<AnimationGraph>();
 
 	huskTexture = content->LoadTexture("Textures/great_husk_sentry.DDS");
+	map = ImportMap("Assets/Maps/test_for_engine_export.json");
+
+	for (const auto& tileSet : map.tilesets)
+	{
+		const auto firstGlobalId = static_cast<u32>(tileSet.firstgid);
+		const auto image = content->LoadTexture(tileSet.image);
+		tileSets.push_back(TileSet{ firstGlobalId, image });
+	}
 
 	for (auto i = 0; i < animations.size(); i++)
 	{
@@ -253,8 +275,8 @@ void SampleGame::OnLoad()
 		shapeDefinition.restitution = 0.0f;
 
 		auto capsuleDefinition = b2Capsule{ .center1 = CastTo<b2Vec2>(vec2{ 0.0f, -40.0f }),
-										   .center2 = CastTo<b2Vec2>(vec2{ 0.0f, 80.0f }),
-										   .radius = 40 };
+											.center2 = CastTo<b2Vec2>(vec2{ 0.0f, 80.0f }),
+											.radius = 40 };
 		const auto shape = b2CreateCapsuleShape(body, &shapeDefinition, &capsuleDefinition);
 		controller.collider = shape;
 		physicsWorld->shapes.push_back(shape);
@@ -465,7 +487,51 @@ void SampleGame::OnDraw([[maybe_unused]] const f32 deltaTime)
 	spriteBatch->Draw(huskTexture, frame.sourceSprite, Rectangle{ CastTo<vec2>(transform.p) - extent / 2.0f, extent },
 					  Colors::White,
 					  animationKey.flip == FrameFlip::horizontal ? FlipSprite::horizontal : FlipSprite::none, origin);
+	/*spriteBatch->End();
+
+	spriteBatch->Begin(cameraMatrix);*/
+	for (const auto& layer : map.layers)
+	{
+		if (layer.type == TiledLayerType::tilelayer)
+		{
+			for (const auto& chunk : layer.chunks)
+			{
+				const auto& data = std::get<TiledLayerData>(chunk.data);
+				const auto width = chunk.width;
+				const auto height = chunk.height;
+				auto index = 0;
+
+				for (auto x = 0; x < width; x++)
+				{
+					for (auto y = 0; y < height; y++)
+					{
+						const auto dirtyGlobalId = data[index];
+						index++;
+						const auto globalId = static_cast<u32>(dirtyGlobalId & 0xfffffff);
+
+						for (const auto& tileSet : tileSets)
+						{
+							const auto& texture = renderContext->Get(tileSet.image);
+							const auto xs = (texture.width / 32);
+							const auto ys = (texture.height / 32);
+							if (tileSet.firstGlobalId <= globalId and globalId < (tileSet.firstGlobalId + xs * ys))
+							{
+								const auto localTileId = globalId - tileSet.firstGlobalId;
+								const auto row = localTileId % xs;
+								const auto col = localTileId / xs;
+								const auto position = vec2{ y * 32 + chunk.x * 32, x * 32 + chunk.y * 32 };
+
+								spriteBatch->Draw(tileSet.image, Rectangle{ { row * 32, col * 32 }, { 32, 32 } },
+												  Rectangle{ position, { 32, 32 } }, Colors::White);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 	spriteBatch->End();
+
 
 	physicsWorld->DebugDraw();
 }
