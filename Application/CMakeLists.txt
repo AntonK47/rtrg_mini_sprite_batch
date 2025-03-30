@@ -6,6 +6,7 @@ find_package(glad CONFIG REQUIRED)
 find_package(gli CONFIG REQUIRED)
 find_package(CURL REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(Tracy CONFIG REQUIRED)
 
 option(DOWNLOAD_ASSETS "Enables asset downoad on strurtup" ON)
 
@@ -45,6 +46,7 @@ PRIVATE
 	vfspp::vfspp
 	CURL::libcurl
 	nlohmann_json::nlohmann_json
+	Tracy::TracyClient
 )
 if(DOWNLOAD_ASSETS)
 	target_compile_definitions(${APPLICATION_NAME} PUBLIC ENABLE_ASSETS_DOWNLOAD)
@@ -63,3 +65,5 @@ else()
 endif()
 
 add_dependencies(${APPLICATION_NAME} CopyAssets)
+
+#target_compile_definitions(${APPLICATION_NAME} PUBLIC TRACY_ENABLE)

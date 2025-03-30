@@ -8,6 +8,8 @@
 
 #include "MapImporter.hpp"
 
+#include <tracy/Tracy.hpp>
+
 using namespace tiled;
 
 struct CharacterController
@@ -32,6 +34,16 @@ struct TileSet
 };
 
 std::vector<TileSet> tileSets{};
+constexpr i32 characterHeight = 64;
+
+struct Camera2D
+{
+	vec2 position;
+	b2BodyId cameraBody;
+	b2BodyId lookAtBody;
+};
+
+Camera2D camera;
 
 struct PhysicsWorld
 {
@@ -91,26 +103,29 @@ struct PhysicsWorld
 		debugDraw.DrawCircle = [](b2Vec2 center, float radius, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
+			const auto scale = glm::length(game->cameraMatrix * vec3{ 1.0, 0.0f, 0.0f });
 			auto& drawList = *ImGui::GetBackgroundDrawList();
-			drawList.AddCircle(vec2(game->cameraMatrix * vec3(CastTo<vec2>(center), 1.0f)), radius,
+			drawList.AddCircle(vec2(game->cameraMatrix * vec3(CastTo<vec2>(center), 1.0f)), scale * radius,
 							   ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color,
 							   static_cast<int>(debugLinesThickness));
 		};
 		debugDraw.DrawSolidCircle = [](b2Transform transform, float radius, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
+			const auto scale = glm::length(game->cameraMatrix * vec3{ 1.0, 0.0f, 0.0f });
 			auto& drawList = *ImGui::GetBackgroundDrawList();
 			const auto center = b2TransformPoint(transform, b2Vec2{ 0.0f, 0.0f });
-			drawList.AddCircleFilled(vec2(game->cameraMatrix * vec3(CastTo<vec2>(center), 1.0f)), radius,
+			drawList.AddCircleFilled(vec2(game->cameraMatrix * vec3(CastTo<vec2>(center), 1.0f)), scale * radius,
 									 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
 		};
 		debugDraw.DrawSolidCapsule = [](b2Vec2 p1, b2Vec2 p2, float radius, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
+			const auto scale = glm::length(game->cameraMatrix * vec3{ 1.0, 0.0f, 0.0f });
 			auto& drawList = *ImGui::GetBackgroundDrawList();
-			drawList.AddCircleFilled(vec2(game->cameraMatrix * vec3(CastTo<vec2>(p1), 1.0f)), radius,
+			drawList.AddCircleFilled(vec2(game->cameraMatrix * vec3(CastTo<vec2>(p1), 1.0f)), scale * radius,
 									 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
-			drawList.AddCircleFilled(vec2(game->cameraMatrix * vec3(CastTo<vec2>(p2), 1.0f)), radius,
+			drawList.AddCircleFilled(vec2(game->cameraMatrix * vec3(CastTo<vec2>(p2), 1.0f)), scale * radius,
 									 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
 		};
 
@@ -192,6 +207,47 @@ void SampleGame::OnLoad()
 	huskTexture = content->LoadTexture("Textures/great_husk_sentry.DDS");
 	map = ImportMap("Assets/Maps/test_for_engine_export.json");
 
+	for (const auto& layer : map.layers)
+	{
+		if (layer.type == TiledLayerType::objectgroup)
+		{
+			for (const auto& object : layer.objects)
+			{
+				if (not object.polygon.empty())
+				{
+					auto points = std::vector<b2Vec2>{};
+					points.resize(object.polygon.size());
+
+					for (auto i = 0; i < object.polygon.size(); i++)
+					{
+						points[i] = b2Vec2{ static_cast<float>(object.polygon[i].x + object.x),
+											static_cast<float>(object.polygon[i].y + object.y) };
+					}
+
+					auto material = b2SurfaceMaterial{};
+					material.friction = 0.2f;
+					material.customColor = b2_colorSteelBlue;
+					material.material = 42;
+
+					auto chainDefinition = b2DefaultChainDef();
+					chainDefinition.points = points.data();
+					chainDefinition.count = static_cast<int>(points.size());
+					chainDefinition.isLoop = true;
+					chainDefinition.materialCount = 1;
+					chainDefinition.materials = &material;
+
+					auto bodyDefinition = b2DefaultBodyDef();
+					auto bodyId = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
+
+					auto shape = b2CreateChain(bodyId, &chainDefinition);
+
+					// physicsWorld->shapes.push_back(shape);
+				}
+			}
+		}
+	}
+
+
 	for (const auto& tileSet : map.tilesets)
 	{
 		const auto firstGlobalId = static_cast<u32>(tileSet.firstgid);
@@ -221,65 +277,57 @@ void SampleGame::OnLoad()
 	characterAnimationInstance =
 		AnimationInstance{ .currentNodeIndex = animationGraph->GetNodeIndex("idle-right"), .key = 0 };
 
-
-	{
-		auto bodyDefinition = b2DefaultBodyDef();
-		bodyDefinition.position = CastTo<b2Vec2>(vec2{ 400.0f, 500.0f });
-		bodyDefinition.name = "floor_0";
-		auto body = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
-
-		auto box = b2MakeBox(300.0f, 10.0f);
-		const auto shapeDefinition = b2DefaultShapeDef();
-		const auto shape = b2CreatePolygonShape(body, &shapeDefinition, &box);
-		physicsWorld->shapes.push_back(shape);
-	}
-	{
-		auto bodyDefinition = b2DefaultBodyDef();
-		bodyDefinition.position = CastTo<b2Vec2>(vec2{ 900.0f, 900.0f });
-		bodyDefinition.name = "floor_1";
-		auto body = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
-
-		auto box = b2MakeBox(40.0f, 10.0f);
-		const auto shapeDefinition = b2DefaultShapeDef();
-		const auto shape = b2CreatePolygonShape(body, &shapeDefinition, &box);
-		physicsWorld->shapes.push_back(shape);
-	}
-	{
-		auto bodyDefinition = b2DefaultBodyDef();
-		bodyDefinition.position = CastTo<b2Vec2>(vec2{ 1900.0f, 900.0f });
-		bodyDefinition.name = "floor_3";
-		bodyDefinition.rotation = b2MakeRot(0.15f * B2_PI);
-		auto bodyId = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
-
-		auto box = b2MakeBox(400.0f, 10.0f);
-		const auto shapeDefinition = b2DefaultShapeDef();
-		const auto shape = b2CreatePolygonShape(bodyId, &shapeDefinition, &box);
-		physicsWorld->shapes.push_back(shape);
-	}
 	{
 		auto bodyDefinition = b2DefaultBodyDef();
 		bodyDefinition.type = b2_dynamicBody;
 		bodyDefinition.position = CastTo<b2Vec2>(vec2{ 400.0f, 100.0f });
-		// bodyDefinition.rotation = b2MakeRot(0.25f * B2_PI);
+
 		bodyDefinition.name = "dynamic_element";
 		bodyDefinition.fixedRotation = true;
 
 		const auto body = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
-		const auto box = b2MakeBox(100.0f, 100.0f);
 
 
 		auto shapeDefinition = b2DefaultShapeDef();
 		// TODO: set more intuitive values
-		shapeDefinition.density = 0.0001f;
-		shapeDefinition.friction = 1.0f;
+		shapeDefinition.density = 0.007f;
+		shapeDefinition.friction = 0.2f;
 		shapeDefinition.restitution = 0.0f;
 
-		auto capsuleDefinition = b2Capsule{ .center1 = CastTo<b2Vec2>(vec2{ 0.0f, -40.0f }),
-											.center2 = CastTo<b2Vec2>(vec2{ 0.0f, 80.0f }),
-											.radius = 40 };
+		auto capsuleDefinition = b2Capsule{ .center1 = CastTo<b2Vec2>(vec2{ 0.0f, -characterHeight / 4.0f }),
+											.center2 = CastTo<b2Vec2>(vec2{ 0.0f, +characterHeight / 4.0f }),
+											.radius = characterHeight / 4.0f };
 		const auto shape = b2CreateCapsuleShape(body, &shapeDefinition, &capsuleDefinition);
 		controller.collider = shape;
 		physicsWorld->shapes.push_back(shape);
+	}
+
+	/*=============CAMERA=============*/
+	{
+		auto bodyDefinition = b2DefaultBodyDef();
+		bodyDefinition.type = b2BodyType::b2_staticBody;
+		bodyDefinition.isEnabled = true;
+		camera.lookAtBody = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
+		bodyDefinition.type = b2BodyType::b2_kinematicBody;
+		camera.cameraBody = b2CreateBody(physicsWorld->worldId, &bodyDefinition);
+		auto box = b2MakeBox(10.0f, 10.0f);
+		auto shapeDefinition = b2DefaultShapeDef();
+		shapeDefinition.density = 0.1f;
+		shapeDefinition.friction = 0.2f;
+		shapeDefinition.restitution = 0.0f;
+		const auto shape = b2CreatePolygonShape(camera.cameraBody, &shapeDefinition, &box);
+		b2DistanceJointDef jointDef = b2DefaultDistanceJointDef();
+		jointDef.bodyIdA = camera.cameraBody;
+		jointDef.bodyIdB = camera.lookAtBody;
+		jointDef.enableSpring = true;
+		jointDef.hertz = 2.0f;
+		jointDef.dampingRatio = 1.0f;
+
+
+		jointDef.minLength = 0;
+		jointDef.maxLength = 200;
+
+		b2JointId myJointId = b2CreateDistanceJoint(physicsWorld->worldId, &jointDef);
 	}
 }
 
@@ -329,12 +377,23 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 	const auto rotation =
 		ImGui::GetKeyData(ImGuiKey_GamepadL2)->AnalogValue - ImGui::GetKeyData(ImGuiKey_GamepadR2)->AnalogValue;
 
+	auto scale = 1.0f;
+	if (ImGui::IsKeyPressed(ImGuiKey_GamepadL1, false))
+	{
+		scale = 0.9f;
+	}
+	if (ImGui::IsKeyPressed(ImGuiKey_GamepadR1, false))
+	{
+		scale = 1.1f;
+	}
+
 	cameraMatrix = glm::translate(cameraMatrix, rightStickDirection * 1000.0f * deltaTime);
 	static auto origin =
 		vec2(renderContext->GetWindowsContext().width / 2, renderContext->GetWindowsContext().height / 2);
 	origin -= rightStickDirection * 1000.0f * deltaTime;
 	cameraMatrix = glm::translate(cameraMatrix, origin);
 	cameraMatrix = glm::rotate(cameraMatrix, glm::radians(rotation * 180 * deltaTime));
+	cameraMatrix = glm::scale(cameraMatrix, vec2{ 1.0f, 1.0f } * scale);
 	cameraMatrix = glm::translate(cameraMatrix, -origin);
 
 	ImGui::SliderFloat2("left_stick", (float*)(&stickDirection), -1.0f, 1.0f);
@@ -343,7 +402,7 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 	if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown))
 	{
 		const auto body = b2Shape_GetBody(controller.collider);
-		const auto impulse = vec2(0.0f, -600.0f) + CastTo<vec2>(b2Body_GetLinearVelocity(body));
+		const auto impulse = vec2(0.0f, -6000.0f) + CastTo<vec2>(b2Body_GetLinearVelocity(body));
 		b2Body_ApplyLinearImpulseToCenter(body, CastTo<b2Vec2>(impulse), true);
 	}
 
@@ -361,7 +420,6 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 		b2Body_ApplyForce(body, CastTo<b2Vec2>(force), CastTo<b2Vec2>(forceSourcePosition), true);
 	}
 
-	b2World_Step(physicsWorld->worldId, deltaTime, 8);
 
 	controller.position = CastTo<vec2>(b2Body_GetPosition(b2Shape_GetBody(controller.collider)));
 
@@ -455,6 +513,11 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 		}
 	}
 	b2Body_ApplyLinearImpulseToCenter(body, CastTo<b2Vec2>(f), true);
+
+	b2Body_SetTransform(camera.lookAtBody, CastTo<b2Vec2>(controller.position), b2Rot_identity);
+	b2World_Step(physicsWorld->worldId, deltaTime, 8);
+
+	// cameraMatrix = glm::translate(glm::identity<mat3>(), origin-CastTo<vec2>(b2Body_GetPosition(camera.cameraBody)));
 }
 
 void SampleGame::OnDraw([[maybe_unused]] const f32 deltaTime)
@@ -483,24 +546,34 @@ void SampleGame::OnDraw([[maybe_unused]] const f32 deltaTime)
 
 	spriteBatch->Begin(cameraMatrix);
 	const auto origin = frame.sourceSprite.position + vec2{ frame.sourceSprite.extent.x / 2.0f, 0.0f };
-	const auto extent = vec2{ 240 * frameAspectRation, 240 };
+	const auto extent = vec2{ characterHeight * frameAspectRation, characterHeight };
 	spriteBatch->Draw(huskTexture, frame.sourceSprite, Rectangle{ CastTo<vec2>(transform.p) - extent / 2.0f, extent },
 					  Colors::White,
 					  animationKey.flip == FrameFlip::horizontal ? FlipSprite::horizontal : FlipSprite::none, origin);
 	/*spriteBatch->End();
 
 	spriteBatch->Begin(cameraMatrix);*/
+	const auto& texture = renderContext->Get(tileSets[0].image);
+	const auto xs = (texture.width / 32);
+	const auto ys = (texture.height / 32);
+
+
 	for (const auto& layer : map.layers)
 	{
 		if (layer.type == TiledLayerType::tilelayer)
 		{
 			for (const auto& chunk : layer.chunks)
 			{
+
 				const auto& data = std::get<TiledLayerData>(chunk.data);
 				const auto width = chunk.width;
 				const auto height = chunk.height;
-				auto index = 0;
 
+				/*for (auto ox = 0; ox < 100; ox++)
+				{
+					for (auto oy = 0; oy < 100; oy++)
+					{*/
+				auto index = 0;
 				for (auto x = 0; x < width; x++)
 				{
 					for (auto y = 0; y < height; y++)
@@ -511,25 +584,27 @@ void SampleGame::OnDraw([[maybe_unused]] const f32 deltaTime)
 
 						for (const auto& tileSet : tileSets)
 						{
-							const auto& texture = renderContext->Get(tileSet.image);
-							const auto xs = (texture.width / 32);
-							const auto ys = (texture.height / 32);
+
 							if (tileSet.firstGlobalId <= globalId and globalId < (tileSet.firstGlobalId + xs * ys))
 							{
 								const auto localTileId = globalId - tileSet.firstGlobalId;
 								const auto row = localTileId % xs;
 								const auto col = localTileId / xs;
-								const auto position = vec2{ y * 32 + chunk.x * 32, x * 32 + chunk.y * 32 };
+								const auto position = vec2{ y * 32 + chunk.x * 32, x * 32 + chunk.y * 32 } +
+									vec2{ layer.offsetx, layer.offsety } /* + vec2{ ox, oy } * 500.0f*/;
 
 								spriteBatch->Draw(tileSet.image, Rectangle{ { row * 32, col * 32 }, { 32, 32 } },
 												  Rectangle{ position, { 32, 32 } }, Colors::White);
 							}
 						}
+						/*	}
+						}*/
 					}
 				}
 			}
 		}
 	}
+
 	spriteBatch->End();
 
 

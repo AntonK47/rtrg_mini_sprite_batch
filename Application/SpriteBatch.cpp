@@ -8,6 +8,8 @@
 #include <fstream>
 #include <sstream>
 
+#include <tracy/Tracy.hpp>
+
 namespace
 {
 	TextAsset LoadText(const std::filesystem::path& asset)
@@ -20,13 +22,6 @@ namespace
 	}
 } // namespace
 #define glLabel(s) (GLuint) strlen(s), s
-
-struct SpriteQuadVertex
-{
-	vec2 position;
-	vec2 uv;
-	vec4 color;
-};
 
 SpriteBatch::SpriteBatch(RenderContext* context) : renderContext(context)
 {
@@ -89,6 +84,7 @@ SpriteBatch::~SpriteBatch()
 
 void SpriteBatch::Begin(const mat3& transform)
 {
+	//ZoneScoped;
 	const auto& framebuffer = renderContext->Get(renderContext->GetDefaultFramebuffer());
 	const auto& framebufferTexture = renderContext->Get(framebuffer.colorAttachment[0]);
 	glViewport(0, 0, framebufferTexture.width, framebufferTexture.height);
@@ -115,12 +111,10 @@ void SpriteBatch::Begin(const mat3& transform)
 
 void SpriteBatch::End()
 {
+	//ZoneScoped;
 	const auto hasSomeWork = true;
 	if (hasSomeWork)
 	{
-		std::vector<SpriteQuadVertex> generatedVertices;
-		generatedVertices.reserve(spriteInfos.size() * 6);
-
 		std::sort(spriteInfos.begin(), spriteInfos.end(),
 				  [](const SpriteBatch::SpriteInfo& a, const SpriteBatch::SpriteInfo& b)
 				  { return a.texture > b.texture; });
@@ -129,19 +123,11 @@ void SpriteBatch::End()
 		auto vertexOffset = u32{ 0 };
 		auto vertexCount = u32{ 0 };
 
-		struct Batch
-		{
-			Texture2DHandle texture;
-			u32 vertexOffset;
-			u32 vertexCount;
-		};
-
-		std::vector<Batch> batches;
 
 		for (const auto& spriteInfo : spriteInfos)
 		{
-			const auto position = spriteInfo.destination.position;
-			const auto extent = spriteInfo.destination.extent;
+			const auto position = round(spriteInfo.destination.position);
+			const auto extent = spriteInfo.destination.extent + vec2{ 1.0f, 1.0f }; // TODO: investigate
 			const auto color = vec4{ spriteInfo.color.r / 255.0f, spriteInfo.color.g / 255.0f,
 									 spriteInfo.color.b / 255.0f, spriteInfo.color.a / 255.0f };
 
@@ -195,14 +181,21 @@ void SpriteBatch::End()
 			const auto& texture = renderContext->Get(batch.texture);
 			glBindTextureUnit(0, texture.nativeHandle);
 
-			//TODO: we need a proper way to set up a texture sampler
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			// TODO: we need a proper way to set up a texture sampler
+			glTextureParameteri(texture.nativeHandle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTextureParameteri(texture.nativeHandle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			/*glTextureParameteri(texture.nativeHandle, GL_TEXTURE_MAX_LEVEL, 0);
+			glTextureParameteri(texture.nativeHandle, GL_TEXTURE_MIN_LOD, 0);
+			glTextureParameteri(texture.nativeHandle, GL_TEXTURE_MAX_LOD, 0);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);*/
 			glDrawArraysInstancedBaseInstance(GL_TRIANGLES, batch.vertexOffset, batch.vertexCount, 1, 0);
 		}
 	}
 	glDisable(GL_BLEND);
 	spriteInfos.clear();
+	generatedVertices.clear();
+	batches.clear();
 }
 
 void SpriteBatch::Draw(const Texture2DHandle texture, const vec2& postion, const Color& color)
@@ -225,6 +218,7 @@ void SpriteBatch::Draw(const Texture2DHandle texture, const Rectangle& destinati
 void SpriteBatch::Draw(const Texture2DHandle texture, const Rectangle& source, const Rectangle& destination,
 					   const Color& color, const FlipSprite flip, const vec2& origin, float rotation, float layer)
 {
+	//ZoneScoped;
 	spriteInfos.push_back(SpriteInfo{ .texture = texture,
 									  .source = source,
 									  .destination = destination,

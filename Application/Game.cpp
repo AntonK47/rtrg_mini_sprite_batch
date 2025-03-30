@@ -11,6 +11,21 @@
 #include "ImGui.hpp"
 #include "RenderContext.hpp"
 
+#include <tracy/Tracy.hpp>
+
+#ifdef TRACY_ENABLE
+void* operator new(std::size_t count)
+{
+	auto ptr = malloc(count);
+	TracyAllocS(ptr, count, 30);
+	return ptr;
+}
+void operator delete(void* ptr) noexcept
+{
+	TracyFreeS(ptr, 30);
+	free(ptr);
+}
+#endif
 namespace
 {
 	void __stdcall MessageCallback(GLenum, GLenum type, GLuint, GLenum severity, GLsizei, const GLchar* message,
@@ -145,13 +160,16 @@ public:
 			ImGui::NewFrame();
 
 			game.OnUpdate(io.DeltaTime);
-
-			game.OnDraw(io.DeltaTime);
+			{
+				ZoneScopedNS("Draw", 30);
+				game.OnDraw(io.DeltaTime);
+			}
 			ImGui::Render();
 			game.renderContext->Blit();
 
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			SDL_GL_SwapWindow(window);
+			FrameMark;
 		}
 
 		game.OnUnload();

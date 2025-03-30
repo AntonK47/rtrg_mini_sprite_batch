@@ -59,7 +59,7 @@ struct ContentManager::ContentManagerImpl
 					curl_easy_setopt(curl, CURLOPT_HEADERDATA, &fileSize);
 					curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-					const auto result = curl_easy_perform(curl);
+					[[maybe_unused]] const auto result = curl_easy_perform(curl);
 					assert(result == CURLE_OK);
 
 					auto in = std::ifstream(targetFile, std::ifstream::ate | std::ifstream::binary);
@@ -78,7 +78,7 @@ struct ContentManager::ContentManagerImpl
 						curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
 						curl_easy_setopt(curl, CURLOPT_WRITEDATA, file);
 						curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-						const auto result = curl_easy_perform(curl);
+						[[maybe_unused]] const auto result = curl_easy_perform(curl);
 						assert(result == CURLE_OK);
 
 						fclose(file);

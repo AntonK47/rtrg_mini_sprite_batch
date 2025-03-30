@@ -47,6 +47,21 @@ private:
 	GraphicsPipelineHandle defaultSpriteBatchPipeline;
 	Buffer uniformBuffer;
 	u32 uniformConstantsSize{};
+	
+	struct SpriteQuadVertex
+	{
+		vec2 position;
+		vec2 uv;
+		vec4 color;
+	};
+	std::vector<SpriteQuadVertex> generatedVertices;
+	struct Batch
+	{
+		Texture2DHandle texture;
+		u32 vertexOffset;
+		u32 vertexCount;
+	};
+	std::vector<Batch> batches;
 
 public:
 	struct SpriteInfo
