@@ -10,6 +10,12 @@ layout(binding = 0) uniform spriteBatchConstants
 	mat4 transform;
 } SpriteBatchConstants;
 
+layout(binding = 1) uniform spriteBatchConstants
+{
+	vec2 pointLightPosition;
+	vec4 pointLightColor;
+} LightConstants;
+
 out gl_PerVertex
 {
 	vec4 gl_Position;

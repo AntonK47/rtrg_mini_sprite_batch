@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <print>
+#include <chrono>
 
 #include "Animation.hpp"
 #include "Common.hpp"
@@ -81,6 +82,8 @@ public:
 			return;
 		}
 		SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+		// TODO: ther is an issue with vsync, domehow it is not working in a windowed mode
+		//SDL_SetWindowFullscreen(window, true);
 
 		SDL_GLContext gl_context = SDL_GL_CreateContext(window);
 
@@ -94,7 +97,7 @@ public:
 		gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress);
 
 		SDL_GL_MakeCurrent(window, gl_context);
-		SDL_GL_SetSwapInterval(1); // Enable vsync
+		SDL_GL_SetSwapInterval(1);
 		SDL_ShowWindow(window);
 
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
@@ -124,12 +127,17 @@ public:
 
 		game.content = std::make_unique<ContentManager>(game.renderContext.get(), "Assets");
 
+		auto time = std::chrono::high_resolution_clock::now();
 
 		game.OnLoad();
 
 		bool done = false;
 		while (!done)
 		{
+			const auto newTime = std::chrono::high_resolution_clock::now();
+			const auto frameTime = (newTime - time);
+			const auto frameTimeInSeconds = std::chrono::duration<f32>(frameTime).count();
+			time = newTime;
 			auto event = SDL_Event{};
 			while (SDL_PollEvent(&event))
 			{
@@ -159,14 +167,17 @@ public:
 			ImGui_ImplSDL3_NewFrame();
 			ImGui::NewFrame();
 
-			game.OnUpdate(io.DeltaTime);
+			game.OnUpdate(frameTimeInSeconds);
 			{
 				ZoneScopedNS("Draw", 30);
-				game.OnDraw(io.DeltaTime);
+				
+				game.OnDraw(frameTimeInSeconds);
 			}
-			ImGui::Render();
-			game.renderContext->Blit();
 
+			ImGui::LabelText("Delta Time", "%f", frameTimeInSeconds);
+			ImGui::Render();
+			
+			//glFinish();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			SDL_GL_SwapWindow(window);
 			FrameMark;

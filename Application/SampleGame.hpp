@@ -3,7 +3,7 @@
 #include "SpriteBatch.hpp"
 #include "Animation.hpp"
 #include "RenderResources.hpp"
-
+#include "Effect.hpp"
 #include <memory>
 
 struct SampleGame : Game
@@ -21,9 +21,12 @@ private:
 	std::unique_ptr<AnimationPlayer> animationPlayer;
 	std::unique_ptr<AnimationGraph> animationGraph;
 
+	std::unique_ptr<DefaultSpriteBatchEffect> defaultEffect;
+
 	AnimationInstance characterAnimationInstance{};
 	AnimationSequence characterAnimationSequence{};
 
 	Texture2DHandle huskTexture{};
+	FramebufferHandle nonDefaultFramebuffer{};
 
 };

@@ -9,6 +9,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(Tracy CONFIG REQUIRED)
 
 option(DOWNLOAD_ASSETS "Enables asset downoad on strurtup" ON)
+option(ENABLE_TRACY "Enables Tracy profiler" OFF)
 
 add_executable(${APPLICATION_NAME})
 target_compile_features(${APPLICATION_NAME} PUBLIC cxx_std_23)
@@ -33,6 +34,8 @@ target_sources(${APPLICATION_NAME} PRIVATE
 	ContentManager.hpp
 	MapImporter.hpp
 	MapImporter.cpp
+	Effect.hpp
+	Effect.cpp
 )
 target_link_libraries(
 	${APPLICATION_NAME} 
@@ -46,7 +49,6 @@ PRIVATE
 	vfspp::vfspp
 	CURL::libcurl
 	nlohmann_json::nlohmann_json
-	Tracy::TracyClient
 )
 if(DOWNLOAD_ASSETS)
 	target_compile_definitions(${APPLICATION_NAME} PUBLIC ENABLE_ASSETS_DOWNLOAD)
@@ -64,6 +66,13 @@ else()
 	target_compile_options(${APPLICATION_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
-add_dependencies(${APPLICATION_NAME} CopyAssets)
+if(ENABLE_TRACY)
+	target_link_libraries(
+		${APPLICATION_NAME} 
+	PRIVATE
+		Tracy::TracyClient
+	)
+	target_compile_definitions(${APPLICATION_NAME} PUBLIC TRACY_ENABLE)
+endif()
 
-#target_compile_definitions(${APPLICATION_NAME} PUBLIC TRACY_ENABLE)
+add_dependencies(${APPLICATION_NAME} CopyAssets)

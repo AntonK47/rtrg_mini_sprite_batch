@@ -29,12 +29,14 @@ enum class FlipSprite
 	horizontalAndVertical
 };
 
+struct Effect;
+
 struct SpriteBatch
 {
 	SpriteBatch(RenderContext* context);
 	virtual ~SpriteBatch();
 
-	void Begin(const mat3& transform = mat3{ 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f });
+	void Begin(const mat3& transform = mat3{ 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f }, Effect* effect = nullptr);
 	void End();
 
 	void Draw(const Texture2DHandle texture, const vec2& postion, const Color& color = Colors::White);

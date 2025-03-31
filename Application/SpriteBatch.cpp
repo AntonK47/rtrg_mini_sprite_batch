@@ -2,6 +2,7 @@
 
 #include "ContentManager.hpp"
 #include "RenderContext.hpp"
+#include "Effect.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -21,16 +22,13 @@ namespace
 		return TextAsset{ stream.str() };
 	}
 } // namespace
-#define glLabel(s) (GLuint) strlen(s), s
 
 SpriteBatch::SpriteBatch(RenderContext* context) : renderContext(context)
 {
 	glCreateBuffers(1, &vertexBuffer);
-	glObjectLabel(GL_BUFFER, vertexBuffer, glLabel("sprite_batch_buffer"));
 	glNamedBufferStorage(vertexBuffer, defaultBufferSize, nullptr, GL_DYNAMIC_STORAGE_BIT);
 
 	glCreateVertexArrays(1, &vertexArrayObject);
-	// glObjectLabel(GL_VERTEX_ARRAY, vertexArrayObject, glLabel("sprite_batch_vao"));
 	const auto positionAttribute = GLuint{ 0 };
 	const auto textureCoordinateAttribute = GLuint{ 1 };
 	const auto colorAttribute = GLuint{ 2 };
@@ -67,7 +65,7 @@ SpriteBatch::SpriteBatch(RenderContext* context) : renderContext(context)
 
 	uniformBuffer.mappedPtr = static_cast<void*>(glMapNamedBufferRange(
 		uniformBuffer.nativeHandle, 0, uniformConstantsSize,
-		GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
+		GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT));
 
 
 	defaultSpriteBatchPipeline = renderContext->CreateGraphicsPipeline(GraphicsPipelineDescriptor{
@@ -82,10 +80,22 @@ SpriteBatch::~SpriteBatch()
 	renderContext->DestroyGraphicsPipeline(defaultSpriteBatchPipeline);
 }
 
-void SpriteBatch::Begin(const mat3& transform)
+void SpriteBatch::Begin(const mat3& transform, Effect* effect)
 {
 	//ZoneScoped;
-	const auto& framebuffer = renderContext->Get(renderContext->GetDefaultFramebuffer());
+	auto fbo = FramebufferHandle{};
+	auto pso = GraphicsPipelineHandle{};
+	if (effect)
+	{
+		fbo = effect->fbo;
+		pso = effect->pso;
+	}
+	else
+	{
+		fbo = renderContext->GetDefaultFramebuffer();
+		pso = defaultSpriteBatchPipeline;
+	}
+	const auto& framebuffer = renderContext->Get(fbo);
 	const auto& framebufferTexture = renderContext->Get(framebuffer.colorAttachment[0]);
 	glViewport(0, 0, framebufferTexture.width, framebufferTexture.height);
 	glClipControl(GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE);
@@ -96,7 +106,7 @@ void SpriteBatch::Begin(const mat3& transform)
 
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.nativeHandle);
 
-	glBindProgramPipeline(renderContext->Get(defaultSpriteBatchPipeline).nativeHandle);
+	glBindProgramPipeline(renderContext->Get(pso).nativeHandle);
 	glBindVertexArray(vertexArrayObject);
 	// TODO:glBindTextureUnit, glBindSamplers, glBindBufferRange for uniforms
 	const auto uniformConstants =
@@ -105,6 +115,7 @@ void SpriteBatch::Begin(const mat3& transform)
 							  .transform = transform };
 	std::memcpy(uniformBuffer.mappedPtr, &uniformConstants, sizeof(SpriteBatchConstants));
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uniformBuffer.nativeHandle, 0, uniformConstantsSize);
+	glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
@@ -126,7 +137,7 @@ void SpriteBatch::End()
 
 		for (const auto& spriteInfo : spriteInfos)
 		{
-			const auto position = round(spriteInfo.destination.position);
+			const auto position =spriteInfo.destination.position;
 			const auto extent = spriteInfo.destination.extent + vec2{ 1.0f, 1.0f }; // TODO: investigate
 			const auto color = vec4{ spriteInfo.color.r / 255.0f, spriteInfo.color.g / 255.0f,
 									 spriteInfo.color.b / 255.0f, spriteInfo.color.a / 255.0f };
@@ -175,6 +186,9 @@ void SpriteBatch::End()
 
 		glNamedBufferSubData(vertexBuffer, 0, generatedVertices.size() * sizeof(SpriteQuadVertex),
 							 generatedVertices.data());
+
+	glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
+
 
 		for (const auto& batch : batches)
 		{

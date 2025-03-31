@@ -79,7 +79,7 @@ struct Texture2D
 struct Framebuffer
 {
 	GLuint nativeHandle{ 0 };
-	std::array<Texture2DHandle, 1> colorAttachment{};
+	std::array<Texture2DHandle, 1> colorAttachment{}; // TODO: extend to multiple color attachments
 	std::optional<Texture2DHandle> depthAttachment{ std::nullopt };
 	bool isSizeDependent{ false };
 };

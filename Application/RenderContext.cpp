@@ -131,12 +131,37 @@ void RenderContext::Blit()
 	glDisable(GL_BLEND);
 }
 
-void RenderContext::Clear(const Color& color)
+void RenderContext::Blit(const FramebufferHandle from, const u32 index)
 {
-	const auto& framebuffer = Get(defaultFramebuffer);
+	assert(index == 0);
+	const auto& framebuffer = Get(from);
+	const auto& colorTexture = Get(framebuffer.colorAttachment[index]);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, windowContext.width, windowContext.height);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBindProgramPipeline(Get(fullscreenQuadPipeline).nativeHandle);
+	glBindTextureUnit(0, colorTexture.nativeHandle);
+	glDrawArraysInstancedBaseInstance(GL_TRIANGLES, 0, 3, 1, 0);
+	glDisable(GL_BLEND);
+}
+
+void RenderContext::Clear(const Color& color, const FramebufferHandle framebuffer)
+{
+	auto framebufferHandle = FramebufferHandle{};
+	if (framebuffer == framebufferHandle)
+	{
+		framebufferHandle = defaultFramebuffer;
+	}
+	else
+	{
+		framebufferHandle = framebuffer;
+	}
+	const auto& fbo = Get(framebufferHandle);
 	const auto colorClearValue = std::array{ 0.0f, 0.0f, 0.0f, 0.0f };
-	glClearNamedFramebufferfv(framebuffer.nativeHandle, GL_COLOR, 0, colorClearValue.data());
-	glClearNamedFramebufferfi(framebuffer.nativeHandle, GL_DEPTH_STENCIL, 0, 0.0f, 0);
+	glClearNamedFramebufferfv(fbo.nativeHandle, GL_COLOR, 0, colorClearValue.data());
+	glClearNamedFramebufferfi(fbo.nativeHandle, GL_DEPTH_STENCIL, 0, 0.0f, 0);
+	//TODO: clear dependent on framebuffer images
 
 	{
 		const auto clearColor = vec4(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.0f);
