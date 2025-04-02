@@ -8,6 +8,7 @@
 
 #include "MapImporter.hpp"
 
+#include <glm/matrix.hpp>
 #include <tracy/Tracy.hpp>
 
 using namespace tiled;
@@ -53,6 +54,18 @@ Camera2D camera;
 struct PhysicsBody
 {
 	b2BodyId id;
+};
+
+struct MapLayer
+{
+};
+
+struct MapChunk
+{
+};
+
+struct World
+{
 };
 
 template <typename T>
@@ -329,7 +342,7 @@ void SampleGame::OnLoad()
 	defaultEffect = std::make_unique<DefaultSpriteBatchEffect>(renderContext.get());
 
 	nonDefaultFramebuffer = renderContext->CreateFramebuffer(FramebufferDescriptor{
-		.colorAttachment = { Texture2DDescriptor{ .extent = DynamicExtent{ },
+		.colorAttachment = { Texture2DDescriptor{ .extent = DynamicExtent{},
 												  .format = TextureFormat::rgba8,
 												  .debugName = "non_default_color_render_target" } },
 		.depthAttachment = Texture2DDescriptor{ .extent = DynamicExtent{},
@@ -667,6 +680,67 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 	b2World_Step(physicsWorld->worldId, deltaTime, 4);
 
 	camera.position = CastTo<vec2>(b2Body_GetPosition(camera.cameraBody));
+
+	const auto screenMidle =
+		vec2{ renderContext->GetWindowsContext().width / 2.0f, renderContext->GetWindowsContext().height / 2.0f };
+
+	static auto isOffCamera = false;
+	static auto lastScale = camera.scale;
+	static auto lastRotate = camera.rotation;
+	if (camera.origin != screenMidle and not isOffCamera)
+	{
+		isOffCamera = true;
+		lastScale = camera.scale;
+		lastRotate = camera.rotation;
+	}
+	if (camera.origin != screenMidle)
+	{
+
+
+		auto& drawList = *ImGui::GetBackgroundDrawList();
+
+		auto rotate = [&](const vec2& p) -> vec2
+		{
+			const auto totalPosition = camera.position - camera.origin;
+			auto matrix = glm::translate(glm::identity<mat3>(), camera.origin);
+			matrix = glm::rotate(matrix, glm::radians(camera.rotation - lastRotate));
+			matrix = glm::scale(matrix, vec2{ 1.0f, 1.0f } * camera.scale * 1.0f/lastScale);
+			matrix = glm::translate(matrix, -camera.origin);
+			const auto pp = matrix * vec3{ p, 1.0f };
+			return vec2{ pp };
+		};
+
+		const auto screenSize =
+			vec2{ renderContext->GetWindowsContext().width, renderContext->GetWindowsContext().height };
+		const auto p00 = vec2{ 0.0f, 0.0f } * screenSize + camera.origin - screenMidle;
+		const auto p01 = vec2{ 0.0f, 1.0f } * screenSize + camera.origin - screenMidle;
+		const auto p10 = vec2{ 1.0f, 0.0f } * screenSize + camera.origin - screenMidle;
+		const auto p11 = vec2{ 1.0f, 1.0f } * screenSize + camera.origin - screenMidle;
+
+		const auto lineWidth = 4.0f;
+		const auto lineColor = ImColor{ 1.0f, 0.0f, 0.0f, 1.0f };
+		const auto lineLength = 100.0f;
+
+		drawList.AddLine(rotate(p00), rotate(p00 + vec2{ 1.0f, 0.0f } * lineLength), lineColor, lineWidth);
+		drawList.AddLine(rotate(p00), rotate(p00 + vec2{ 0.0f, 1.0f } * lineLength), lineColor, lineWidth);
+
+		drawList.AddLine(rotate(p01), rotate(p01 + vec2{ 1.0f, 0.0f } * lineLength), lineColor, lineWidth);
+		drawList.AddLine(rotate(p01), rotate(p01 - vec2{ 0.0f, 1.0f } * lineLength), lineColor, lineWidth);
+
+		drawList.AddLine(rotate(p10), rotate(p10 - vec2{ 1.0f, 0.0f } * lineLength), lineColor, lineWidth);
+		drawList.AddLine(rotate(p10), rotate(p10 + vec2{ 0.0f, 1.0f } * lineLength), lineColor, lineWidth);
+
+		drawList.AddLine(rotate(p11), rotate(p11 - vec2{ 1.0f, 0.0f } * lineLength), lineColor, lineWidth);
+		drawList.AddLine(rotate(p11), rotate(p11 - vec2{ 0.0f, 1.0f } * lineLength), lineColor, lineWidth);
+
+		if (ImGui::Button("Reset Camera") or ImGui::IsKeyPressed(ImGuiKey_GamepadR3))
+		{
+			camera.origin = screenMidle;
+			camera.rotation = lastRotate;
+			camera.scale = lastScale;
+			isOffCamera = false;
+		}
+	}
 
 	const auto totalPosition = camera.position - camera.origin;
 	cameraMatrix = glm::translate(glm::identity<mat3>(), camera.origin);

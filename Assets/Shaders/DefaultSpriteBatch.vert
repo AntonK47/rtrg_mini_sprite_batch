@@ -17,8 +17,8 @@ out gl_PerVertex
 
 out block
 {
-		vec2 Texcoord;
-		vec3 Color;
+	vec2 Texcoord;
+	vec3 Color;
 } Out;
 
 void main()
