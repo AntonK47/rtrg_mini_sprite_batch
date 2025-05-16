@@ -60,7 +60,8 @@ endif()
 
 if(MSVC)
     target_compile_options(${APPLICATION_NAME} PRIVATE /experimental:external /external:W0 /external:anglebrackets /external:Iout /external:IThirdParty)
-	target_compile_options(${APPLICATION_NAME} PRIVATE /W4 /WX /MP)
+	target_compile_options(${APPLICATION_NAME} PRIVATE /W4 /WX /MP /ZI)
+	target_link_options(${APPLICATION_NAME} PRIVATE /INCREMENTAL)
 
 else()
 	target_compile_options(${APPLICATION_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)

@@ -71,7 +71,7 @@ set_target_properties(box2d PROPERTIES FOLDER "thirdParty/box2d")
 FetchContent_Declare(
   vfspp
   GIT_REPOSITORY https://github.com/nextgeniuspro/vfspp.git
-  GIT_TAG        master
+  GIT_TAG        v2.0.0
 )
 
 FetchContent_MakeAvailable(vfspp)

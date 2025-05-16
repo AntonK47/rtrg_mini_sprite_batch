@@ -1,8 +1,8 @@
 #include "SpriteBatch.hpp"
 
 #include "ContentManager.hpp"
-#include "RenderContext.hpp"
 #include "Effect.hpp"
+#include "RenderContext.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -63,9 +63,9 @@ SpriteBatch::SpriteBatch(RenderContext* context) : renderContext(context)
 	glNamedBufferStorage(uniformBuffer.nativeHandle, uniformConstantsSize, nullptr,
 						 GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
 
-	uniformBuffer.mappedPtr = static_cast<void*>(glMapNamedBufferRange(
-		uniformBuffer.nativeHandle, 0, uniformConstantsSize,
-		GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT));
+	uniformBuffer.mappedPtr =
+		static_cast<void*>(glMapNamedBufferRange(uniformBuffer.nativeHandle, 0, uniformConstantsSize,
+												 GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT));
 
 
 	defaultSpriteBatchPipeline = renderContext->CreateGraphicsPipeline(GraphicsPipelineDescriptor{
@@ -82,7 +82,7 @@ SpriteBatch::~SpriteBatch()
 
 void SpriteBatch::Begin(const mat3& transform, Effect* effect)
 {
-	//ZoneScoped;
+	// ZoneScoped;
 	auto fbo = FramebufferHandle{};
 	auto pso = GraphicsPipelineHandle{};
 	if (effect)
@@ -122,7 +122,7 @@ void SpriteBatch::Begin(const mat3& transform, Effect* effect)
 
 void SpriteBatch::End()
 {
-	//ZoneScoped;
+	// ZoneScoped;
 	const auto hasSomeWork = true;
 	if (hasSomeWork)
 	{
@@ -137,7 +137,7 @@ void SpriteBatch::End()
 
 		for (const auto& spriteInfo : spriteInfos)
 		{
-			const auto position =spriteInfo.destination.position;
+			const auto position = spriteInfo.destination.position;
 			const auto extent = spriteInfo.destination.extent + vec2{ 1.0f, 1.0f }; // TODO: investigate
 			const auto color = vec4{ spriteInfo.color.r / 255.0f, spriteInfo.color.g / 255.0f,
 									 spriteInfo.color.b / 255.0f, spriteInfo.color.a / 255.0f };
@@ -169,7 +169,6 @@ void SpriteBatch::End()
 
 			generatedVertices.push_back(SpriteQuadVertex{ position + vec2{ extent.x, extent.y }, uv1, color });
 			generatedVertices.push_back(SpriteQuadVertex{ position, uv0, color });
-
 			generatedVertices.push_back(SpriteQuadVertex{ position + vec2{ 0, extent.y }, { uv0.x, uv1.y }, color });
 
 			if (lastTexture != spriteInfo.texture)
@@ -187,7 +186,7 @@ void SpriteBatch::End()
 		glNamedBufferSubData(vertexBuffer, 0, generatedVertices.size() * sizeof(SpriteQuadVertex),
 							 generatedVertices.data());
 
-	glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
+		glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
 
 
 		for (const auto& batch : batches)
@@ -232,7 +231,7 @@ void SpriteBatch::Draw(const Texture2DHandle texture, const Rectangle& destinati
 void SpriteBatch::Draw(const Texture2DHandle texture, const Rectangle& source, const Rectangle& destination,
 					   const Color& color, const FlipSprite flip, const vec2& origin, float rotation, float layer)
 {
-	//ZoneScoped;
+	// ZoneScoped;
 	spriteInfos.push_back(SpriteInfo{ .texture = texture,
 									  .source = source,
 									  .destination = destination,

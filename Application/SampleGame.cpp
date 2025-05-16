@@ -9,9 +9,140 @@
 #include "MapImporter.hpp"
 
 #include <glm/matrix.hpp>
-#include <tracy/Tracy.hpp>
+#include <box2d/id.h>
+// #include <tracy/Tracy.hpp>
 
 using namespace tiled;
+
+struct AnimationEditor
+{
+
+	struct SpanItem
+	{
+		u32 begin;
+		u32 end;
+	};
+
+	void Draw()
+	{
+		static auto item = SpanItem{ 10, 20 };
+		ImGui::Begin("Animation Editor");
+		static auto timelineBegin = 0.0f;
+		ImGui::SliderFloat("timeline_begin", &timelineBegin, 0.0f, 10.0f);
+		static auto timelineZoom = 1.0f;
+		ImGui::SliderFloat("timeline_zoom", &timelineZoom, 1.0f, 10.0f);
+		// const auto position = vec2{ ImGui::GetCursorScreenPos() };
+		const auto width = ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ScrollbarSize;
+		const auto height = ImGui::GetContentRegionAvail().y;
+		auto& drawList = *ImGui::GetWindowDrawList();
+		// const auto channels = 4;
+		// const auto keys = 24;
+
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, vec2{ 0, 0 });
+		ImGui::BeginChild("##timeline", vec2{ width / 4.0f, height }, ImGuiChildFlags_ResizeX | ImGuiChildFlags_Border);
+		ImGui::Button("Play");
+		ImGui::EndChild();
+		ImGui::SameLine();
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, vec2{ 0.0f, 0.0f });
+		ImGui::BeginChild("##timelineFrames", vec2{ -1.0f, height }, ImGuiChildFlags_Border);
+		const auto timelineWidth = ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ScrollbarSize;
+		auto timelineHeight = 20.0f;
+		const auto tickSize = 20.0f * timelineZoom;
+		{
+
+			const auto position = vec2{ ImGui::GetCursorScreenPos() };
+			ImGui::InvisibleButton("##zoneFrames", vec2{ timelineWidth, timelineHeight });
+			/*drawList.AddRectFilled(position, position + vec2{ timelineWidth, timelineHeight },
+								   IM_COL32(255, 255, 255, 255));*/
+			const auto clicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+			static auto previousTimelineBegin = timelineBegin;
+			
+			if (ImGui::IsKeyPressed(ImGuiKey_MouseRight, false))
+			{
+				previousTimelineBegin = timelineBegin;
+			}
+			if (ImGui::IsMouseDragging(ImGuiMouseButton_Right))
+			{
+				const auto dragData = ImGui::GetMouseDragDelta(ImGuiMouseButton_Right);
+				timelineBegin = previousTimelineBegin - dragData.x / tickSize;
+			}
+			else
+			{
+				const auto dragData = ImGui::GetMouseDragDelta(ImGuiMouseButton_Right);
+				timelineBegin = previousTimelineBegin - dragData.x / tickSize;
+			}
+			if (clicked)
+			{
+				const auto mousePosision = vec2{ ImGui::GetMousePos() };
+				const auto mousePositionInTimeline = mousePosision - position;
+				drawList.AddCircleFilled(mousePosision, 5.0f, IM_COL32(255, 255, 255, 255));
+			}
+			auto i = 0;
+			drawList.PushClipRect(position, position + vec2{ timelineWidth, height }, true);
+			while (i * tickSize < timelineWidth)
+			{
+				const auto tickPosition = position + vec2{ glm::ceil(timelineBegin) * tickSize + i * tickSize, 0.0f } -
+					vec2{ timelineBegin * tickSize, 0.0f };
+				drawList.AddLine(tickPosition, tickPosition + vec2{ 0.0f, height }, IM_COL32(255, 255, 255, 255));
+				static char tmp[256];
+				const auto tick = static_cast<i32>(glm::ceil(timelineBegin) + i);
+				sprintf_s(tmp, "%i", tick);
+				const auto lableSize = vec2{ ImGui::CalcTextSize(tmp) };
+				const auto tickLableffset = (vec2{ tickSize, timelineHeight } - lableSize) * 0.5f;
+				drawList.AddText(tickPosition + tickLableffset, IM_COL32(255, 255, 255, 255), tmp);
+				i++;
+			}
+			drawList.AddLine(position, position + vec2{ timelineWidth, 0.0f }, IM_COL32(255, 255, 255, 255));
+			drawList.AddLine(position + vec2{ 0.0f, timelineHeight }, position + vec2{ timelineWidth, timelineHeight },
+							 IM_COL32(255, 255, 255, 255));
+
+
+			{
+				drawList.AddRectFilled(
+					position + vec2{ item.begin * tickSize, 0.0f } - vec2{ timelineBegin * tickSize, 0.0f },
+					position + vec2{ item.end * tickSize, timelineHeight } - vec2{ timelineBegin * tickSize, 0.0f },
+					IM_COL32(255, 0, 0, 255));
+				const auto handleWidth = 10.0f;
+				const auto leftHandle = position + vec2{ item.begin * tickSize, 0.0f } - vec2{ timelineBegin * tickSize, 0.0f };
+				const auto rightHandle = position + vec2{ item.end * tickSize - handleWidth, 0.0f } - vec2{ timelineBegin * tickSize, 0.0f };
+				if(ImGui::IsMouseHoveringRect(leftHandle, leftHandle + vec2{handleWidth, timelineHeight}))
+				{
+					ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+				}
+				if(ImGui::IsMouseHoveringRect(rightHandle, rightHandle + vec2{handleWidth, timelineHeight}))
+				{
+					ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+				}
+				// ImGui::InvisibleButton("##item", vec2{ timelineWidth, timelineHeight });
+			}
+
+			drawList.PopClipRect();
+		}
+
+
+		ImGui::EndChild();
+		ImGui::PopStyleVar();
+		ImGui::PopStyleVar();
+
+		/*ImGui::InvisibleButton( "##zoneFrames", ImVec2( width, height ) );
+
+		const auto nextTick = static_cast<u32>(glm::ceil(timelineBegin));
+
+		for (auto i = 0; i < channels; ++i)
+		{
+			const auto y = position.y + i * height / channels;
+			drawList.AddLine(ImVec2(position.x, y), ImVec2(position.x + width, y), IM_COL32(255, 255, 255, 255));
+			for (auto j = 0; j < keys; ++j)
+			{
+				const auto x = position.x + (j * width / keys);
+				drawList.AddLine(ImVec2(x, y - 5), ImVec2(x, y + 5), IM_COL32(255, 255, 255, 255));
+			}
+		}*/
+		ImGui::End();
+	}
+};
+
+AnimationEditor animationEditor{};
 
 struct CharacterController
 {
@@ -41,12 +172,12 @@ constexpr i32 characterHeight = 64;
 
 struct Camera2D
 {
-	vec2 origin;
-	vec2 position;
+	vec2 origin{};
+	vec2 position{};
 	f32 scale{ 1.0f };
-	f32 rotation;
-	b2BodyId cameraBody;
-	b2BodyId lookAtBody;
+	f32 rotation{};
+	b2BodyId cameraBody{};
+	b2BodyId lookAtBody{};
 };
 
 Camera2D camera;
@@ -195,7 +326,7 @@ struct PhysicsWorld
 	{
 		debugDraw = b2DefaultDebugDraw();
 
-		debugDraw.DrawSegment = [](b2Vec2 p1, b2Vec2 p2, b2HexColor color, void* context)
+		debugDraw.DrawSegmentFcn = [](b2Vec2 p1, b2Vec2 p2, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
@@ -205,7 +336,7 @@ struct PhysicsWorld
 			drawList.AddLine(pp1, pp2, ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color,
 							 debugLinesThickness);
 		};
-		debugDraw.DrawPolygon = [](const b2Vec2* vertices, int vertexCount, b2HexColor color, void* context)
+		debugDraw.DrawPolygonFcn = [](const b2Vec2* vertices, int vertexCount, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
@@ -219,8 +350,8 @@ struct PhysicsWorld
 								 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color, ImDrawFlags_Closed,
 								 debugLinesThickness);
 		};
-		debugDraw.DrawSolidPolygon = [](b2Transform transform, const b2Vec2* vertices, int vertexCount,
-										[[maybe_unused]] float radius, b2HexColor color, void* context)
+		debugDraw.DrawSolidPolygonFcn = [](b2Transform transform, const b2Vec2* vertices, int vertexCount,
+										   [[maybe_unused]] float radius, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
@@ -235,7 +366,7 @@ struct PhysicsWorld
 			drawList.AddConcavePolyFilled((ImVec2*)points.data(), static_cast<int>(points.size()),
 										  ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
 		};
-		debugDraw.DrawCircle = [](b2Vec2 center, float radius, b2HexColor color, void* context)
+		debugDraw.DrawCircleFcn = [](b2Vec2 center, float radius, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
 			const auto scale = glm::length(game->cameraMatrix * vec3{ 1.0, 0.0f, 0.0f });
@@ -244,7 +375,7 @@ struct PhysicsWorld
 							   ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color,
 							   static_cast<int>(debugLinesThickness));
 		};
-		debugDraw.DrawSolidCircle = [](b2Transform transform, float radius, b2HexColor color, void* context)
+		debugDraw.DrawSolidCircleFcn = [](b2Transform transform, float radius, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
 			const auto scale = glm::length(game->cameraMatrix * vec3{ 1.0, 0.0f, 0.0f });
@@ -253,7 +384,7 @@ struct PhysicsWorld
 			drawList.AddCircleFilled(vec2(game->cameraMatrix * vec3(CastTo<vec2>(center), 1.0f)), scale * radius,
 									 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
 		};
-		debugDraw.DrawSolidCapsule = [](b2Vec2 p1, b2Vec2 p2, float radius, b2HexColor color, void* context)
+		debugDraw.DrawSolidCapsuleFcn = [](b2Vec2 p1, b2Vec2 p2, float radius, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
 			const auto scale = glm::length(game->cameraMatrix * vec3{ 1.0, 0.0f, 0.0f });
@@ -264,14 +395,14 @@ struct PhysicsWorld
 									 ImColor{ 0.0f, 0.0f, 0.0f, debugLayerTransparency } + color);
 		};
 
-		debugDraw.DrawString = [](b2Vec2 p, const char* s, b2HexColor color, void* context)
+		debugDraw.DrawStringFcn = [](b2Vec2 p, const char* s, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
 			drawList.AddText(vec2(game->cameraMatrix * vec3(CastTo<vec2>(p), 1.0f)),
 							 ImColor{ 0.0f, 0.0f, 0.0f, 1.0 } + color, s);
 		};
-		debugDraw.DrawTransform = [](b2Transform transform, void* context)
+		debugDraw.DrawTransformFcn = [](b2Transform transform, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
@@ -287,7 +418,7 @@ struct PhysicsWorld
 							 ImColor{ 0.0f, 0.0f, 1.0f, debugLayerTransparency }, debugLinesThickness);
 		};
 
-		debugDraw.DrawPoint = [](b2Vec2 p, float size, b2HexColor color, void* context)
+		debugDraw.DrawPointFcn = [](b2Vec2 p, float size, b2HexColor color, void* context)
 		{
 			auto game = reinterpret_cast<SampleGame*>(context);
 			auto& drawList = *ImGui::GetBackgroundDrawList();
@@ -310,7 +441,7 @@ struct PhysicsWorld
 		ImGui::Checkbox("Draw Shapes", &debugDraw.drawShapes);
 		ImGui::Checkbox("Draw Joints", &debugDraw.drawJoints);
 		ImGui::Checkbox("Draw Joints Extras", &debugDraw.drawJointExtras);
-		ImGui::Checkbox("Draw AABBs", &debugDraw.drawAABBs);
+		ImGui::Checkbox("Draw AABBs", &debugDraw.drawBounds);
 		ImGui::Checkbox("Draw Mass", &debugDraw.drawMass);
 		ImGui::Checkbox("Draw Body Names", &debugDraw.drawBodyNames);
 		ImGui::Checkbox("Draw Contacts", &debugDraw.drawContacts);
@@ -377,7 +508,7 @@ void SampleGame::OnLoad()
 					auto material = b2SurfaceMaterial{};
 					material.friction = 0.2f;
 					material.customColor = b2_colorSteelBlue;
-					material.material = 42;
+					material.userMaterialId = 42;
 
 					auto chainDefinition = b2DefaultChainDef();
 					chainDefinition.points = points.data();
@@ -442,8 +573,8 @@ void SampleGame::OnLoad()
 		auto shapeDefinition = b2DefaultShapeDef();
 		// TODO: set more intuitive values
 		shapeDefinition.density = 0.007f;
-		shapeDefinition.friction = 0.2f;
-		shapeDefinition.restitution = 0.0f;
+		/*shapeDefinition.friction = 0.2f;
+		shapeDefinition.restitution = 0.0f;*/
 
 		auto capsuleDefinition = b2Capsule{ .center1 = CastTo<b2Vec2>(vec2{ 0.0f, -characterHeight / 4.0f }),
 											.center2 = CastTo<b2Vec2>(vec2{ 0.0f, +characterHeight / 4.0f }),
@@ -704,7 +835,7 @@ void SampleGame::OnUpdate(const f32 deltaTime)
 			const auto totalPosition = camera.position - camera.origin;
 			auto matrix = glm::translate(glm::identity<mat3>(), camera.origin);
 			matrix = glm::rotate(matrix, glm::radians(camera.rotation - lastRotate));
-			matrix = glm::scale(matrix, vec2{ 1.0f, 1.0f } * camera.scale * 1.0f/lastScale);
+			matrix = glm::scale(matrix, vec2{ 1.0f, 1.0f } * camera.scale * 1.0f / lastScale);
 			matrix = glm::translate(matrix, -camera.origin);
 			const auto pp = matrix * vec3{ p, 1.0f };
 			return vec2{ pp };
@@ -834,6 +965,8 @@ void SampleGame::OnDraw([[maybe_unused]] const f32 deltaTime)
 	ImGui::Separator();
 	DrawGui(testBody01);
 	ImGui::End();
+
+	animationEditor.Draw();
 
 	renderContext->Blit(nonDefaultFramebuffer, 0);
 }
